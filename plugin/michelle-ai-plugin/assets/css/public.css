@@ -1,0 +1,302 @@
+/* ==========================================================================
+   Michelle AI — Chat Widget Styles
+   ========================================================================== */
+
+:root {
+    --mai-primary:       #6366f1;
+    --mai-secondary:     #f1f5f9;
+    --mai-bg:            #ffffff;
+    --mai-text:          #1e293b;
+    --mai-muted:         #64748b;
+    --mai-border:        #e2e8f0;
+    --mai-shadow:        0 8px 32px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.08);
+    --mai-fab-size:      56px;
+    --mai-radius:        16px;
+    --mai-radius-msg:    18px;
+    --mai-font:          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --mai-transition:    .25s cubic-bezier(.4,0,.2,1);
+}
+
+#mai-chat-widget {
+    position:   fixed;
+    bottom:     24px;
+    right:      24px;
+    z-index:    999999;
+    font-family: var(--mai-font);
+    font-size:  14px;
+    line-height: 1.5;
+}
+
+/* FAB */
+#mai-fab {
+    position:         relative;
+    width:            var(--mai-fab-size);
+    height:           var(--mai-fab-size);
+    border-radius:    50%;
+    background:       var(--mai-primary);
+    color:            #fff;
+    border:           none;
+    cursor:           pointer;
+    display:          flex;
+    align-items:      center;
+    justify-content:  center;
+    box-shadow:       0 4px 16px rgba(0,0,0,.22);
+    transition:       transform var(--mai-transition), box-shadow var(--mai-transition);
+    outline-offset:   3px;
+}
+#mai-fab:hover   { transform: scale(1.08); box-shadow: 0 6px 24px rgba(0,0,0,.28); }
+#mai-fab:active  { transform: scale(.96); }
+.mai-fab-icon { display: flex; width: 24px; height: 24px; }
+.mai-fab-icon svg { width: 100%; height: 100%; }
+
+#mai-fab.mai-has-unread::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid var(--mai-primary);
+    animation: mai-pulse 1.6s ease-out infinite;
+    opacity: 0;
+}
+@keyframes mai-pulse {
+    0%   { transform: scale(.9);  opacity: .8; }
+    70%  { transform: scale(1.2); opacity: 0; }
+    100% { transform: scale(.9);  opacity: 0; }
+}
+
+.mai-unread-dot {
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #ef4444;
+    border: 2px solid #fff;
+    animation: mai-dot-pop .3s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes mai-dot-pop {
+    from { transform: scale(0); }
+    to   { transform: scale(1); }
+}
+
+/* Chat window */
+#mai-chat-window {
+    position:       absolute;
+    bottom:         calc(var(--mai-fab-size) + 12px);
+    right:          0;
+    width:          360px;
+    max-height:     560px;
+    display:        flex;
+    flex-direction: column;
+    background:     var(--mai-bg);
+    border-radius:  var(--mai-radius);
+    box-shadow:     var(--mai-shadow);
+    overflow:       hidden;
+    transform-origin: bottom right;
+}
+
+#mai-chat-window.mai-opening {
+    animation: mai-window-in var(--mai-transition) both;
+}
+@keyframes mai-window-in {
+    from { opacity: 0; transform: scale(.92) translateY(12px); }
+    to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+#mai-chat-window.mai-closing {
+    animation: mai-window-out .2s cubic-bezier(.4,0,1,1) both;
+}
+@keyframes mai-window-out {
+    from { opacity: 1; transform: scale(1)   translateY(0); }
+    to   { opacity: 0; transform: scale(.92) translateY(12px); }
+}
+
+/* Header */
+.mai-chat-header {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    padding:         14px 16px;
+    background:      var(--mai-primary);
+    color:           #fff;
+    flex-shrink:     0;
+}
+.mai-header-left {
+    display: flex; align-items: center; gap: 10px;
+}
+.mai-header-left > div {
+    display: flex; gap: 6px; flex-direction: column;
+    align-items: flex-start; line-height: 1.2;
+}
+.mai-status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%; background: #4ade80; display: inline-block;
+}
+.mai-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    object-fit: cover; flex-shrink: 0;
+}
+.mai-avatar-default {
+    background: rgba(255,255,255,.25); color: #fff;
+    font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+}
+.mai-close-btn {
+    background: none; border: none; color: rgba(255,255,255,.85);
+    cursor: pointer; width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    transition: background var(--mai-transition); padding: 0;
+}
+.mai-close-btn:hover { background: rgba(255,255,255,.15); color: #fff; }
+.mai-close-btn svg   { width: 18px; height: 18px; }
+
+/* Messages */
+.mai-messages {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    scroll-behavior: smooth;
+}
+.mai-messages::-webkit-scrollbar { width: 4px; }
+.mai-messages::-webkit-scrollbar-thumb { background: var(--mai-border); border-radius: 2px; }
+
+.mai-message {
+    display: flex; flex-direction: column; max-width: 78%;
+    animation: mai-msg-in .22s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes mai-msg-in {
+    from { opacity: 0; transform: translateY(8px) scale(.96); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.mai-message.mai-from-visitor { align-self: flex-end; }
+.mai-message.mai-from-admin,
+.mai-message.mai-from-ai      { align-self: flex-start; }
+
+.mai-bubble {
+    padding: 10px 14px; border-radius: 18px;
+    word-break: break-word; white-space: pre-wrap; line-height: 1.55;
+}
+.mai-from-visitor .mai-bubble {
+    background: var(--mai-primary); color: #fff;
+    border-bottom-right-radius: 4px;
+}
+.mai-from-admin .mai-bubble,
+.mai-from-ai    .mai-bubble {
+    background: var(--mai-secondary); color: var(--mai-text);
+    border-bottom-left-radius: 4px;
+}
+
+.mai-msg-meta {
+    font-size: 11px; color: var(--mai-muted);
+    margin-top: 3px; padding: 0 4px;
+}
+.mai-from-visitor .mai-msg-meta { text-align: right; }
+
+/* Quick reply chips */
+.mai-quick-replies {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;
+}
+.mai-qr-btn {
+    padding: 6px 14px;
+    border: 1.5px solid var(--mai-primary);
+    border-radius: 20px; background: #fff;
+    color: var(--mai-primary); font-size: 13px;
+    cursor: pointer; font-family: var(--mai-font);
+    transition: background var(--mai-transition), color var(--mai-transition);
+}
+.mai-qr-btn:hover  { background: var(--mai-primary); color: #fff; }
+.mai-qr-btn:active { transform: scale(.95); }
+
+/* Typing indicator */
+.mai-typing { padding: 0 16px 12px; flex-shrink: 0; }
+.mai-typing-bubble {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 10px 14px; background: var(--mai-secondary);
+    border-radius: 18px; border-bottom-left-radius: 4px;
+}
+.mai-typing-bubble span {
+    width: 6px; height: 6px; background: var(--mai-muted);
+    border-radius: 50%; animation: mai-bounce 1.2s infinite;
+}
+.mai-typing-bubble span:nth-child(2) { animation-delay: .2s; }
+.mai-typing-bubble span:nth-child(3) { animation-delay: .4s; }
+@keyframes mai-bounce {
+    0%,80%,100% { transform: translateY(0); }
+    40%         { transform: translateY(-6px); }
+}
+
+/* Input */
+.mai-input-area {
+    display: flex; align-items: flex-end; gap: 8px;
+    padding: 10px 12px; border-top: 1px solid var(--mai-border);
+    background: var(--mai-bg); flex-shrink: 0;
+}
+.mai-input {
+    flex: 1; border: 1.5px solid var(--mai-border);
+    border-radius: 12px; padding: 8px 12px;
+    font-size: 14px; font-family: var(--mai-font);
+    resize: none; outline: none; max-height: 100px;
+    overflow-y: auto; transition: border-color var(--mai-transition);
+    line-height: 1.5; color: var(--mai-text);
+    box-sizing: border-box;
+}
+.mai-input:focus { border-color: var(--mai-primary); }
+.mai-send-btn {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--mai-primary); color: #fff;
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: filter var(--mai-transition);
+}
+.mai-send-btn:hover   { filter: brightness(1.1); }
+.mai-send-btn:active  { transform: scale(.92); }
+.mai-send-btn:disabled { opacity: .5; cursor: default; }
+.mai-send-btn svg     { width: 18px; height: 18px; }
+
+.mai-powered-by {
+    text-align: center; font-size: 10px;
+    color: var(--mai-muted); margin: 4px 0 8px; flex-shrink: 0;
+}
+
+/* Contact form */
+.mai-contact-body { padding: 16px; overflow-y: auto; flex: 1; }
+#mai-contact-form label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: var(--mai-muted); margin-bottom: 4px; margin-top: 12px;
+    text-transform: uppercase; letter-spacing: .04em;
+}
+#mai-contact-form label:first-child { margin-top: 0; }
+#mai-contact-form input,
+#mai-contact-form textarea {
+    width: 100%; border: 1.5px solid var(--mai-border);
+    border-radius: 8px; padding: 8px 10px;
+    font-size: 14px; font-family: var(--mai-font);
+    color: var(--mai-text); outline: none; box-sizing: border-box;
+    transition: border-color var(--mai-transition);
+}
+#mai-contact-form input:focus,
+#mai-contact-form textarea:focus { border-color: var(--mai-primary); }
+#mai-contact-form textarea { resize: vertical; }
+.mai-cf-submit {
+    margin-top: 16px; width: 100%; padding: 10px;
+    background: var(--mai-primary); color: #fff;
+    border: none; border-radius: 10px; font-size: 14px;
+    font-weight: 600; cursor: pointer; font-family: var(--mai-font);
+    transition: filter var(--mai-transition);
+}
+.mai-cf-submit:hover   { filter: brightness(1.1); }
+.mai-cf-submit:active  { transform: scale(.98); }
+.mai-cf-submit:disabled { opacity: .6; cursor: default; }
+.mai-cf-error {
+    margin-top: 8px; padding: 8px 12px;
+    background: #fef2f2; border: 1px solid #fecaca;
+    border-radius: 8px; color: #b91c1c; font-size: 13px;
+}
+.mai-cf-success {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center;
+    height: 100%; gap: 12px; padding: 24px;
+}
+.mai-cf-success svg { width: 48px; height: 48px; color: #22c55e; }
+.mai-cf-success p   { font-size: 15px; font-weight: 600; color: var(--mai-text); }
+
+@media (max-width: 420px) {
+    #mai-chat-window { width: calc(100vw - 32px); right: -8px; max-height: 70vh; }
+}

@@ -1,0 +1,19 @@
+# Environment
+.env
+
+# Docker volumes (if persisted locally)
+uploads/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+*.swp
+
+# Node
+node_modules/
+
+# PHP
+vendor/
+*.log

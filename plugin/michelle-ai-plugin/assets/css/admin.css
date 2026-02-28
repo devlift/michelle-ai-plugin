@@ -1,0 +1,251 @@
+/* ==========================================================================
+   Michelle AI — Admin Styles
+   ========================================================================== */
+
+.mai-admin { max-width: 1200px; }
+
+/* Tabs */
+.mai-tabs {
+    display:     flex;
+    gap:         2px;
+    border-bottom: 1px solid #c3c4c7;
+    margin:      20px 0 0;
+}
+.mai-tab {
+    padding:       8px 18px;
+    text-decoration: none;
+    color:         #2c3338;
+    font-size:     14px;
+    border:        1px solid transparent;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background:    #f6f7f7;
+    transition:    background .15s;
+}
+.mai-tab:hover       { background: #eee; color: #2c3338; }
+.mai-tab-active,
+.mai-tab.mai-tab-active {
+    background:    #fff;
+    border-color:  #c3c4c7;
+    border-bottom-color: #fff;
+    margin-bottom: -1px;
+    color:         #1d2327;
+    font-weight:   600;
+}
+
+.mai-tab-panel { padding: 20px 0; }
+
+/* Layout */
+.mai-admin-layout {
+    display:   flex;
+    gap:       0;
+    height:    calc(100vh - 160px);
+    min-height: 500px;
+    border:    1px solid #ddd;
+    border-radius: 8px;
+    overflow:  hidden;
+    margin-top: 20px;
+    background: #fff;
+}
+
+/* Conversation list */
+.mai-conv-list {
+    width:        300px;
+    flex-shrink:  0;
+    overflow-y:   auto;
+    border-right: 1px solid #e2e8f0;
+    background:   #fafafa;
+}
+.mai-conv-item {
+    display:     flex;
+    align-items: center;
+    gap:         10px;
+    padding:     12px 14px;
+    text-decoration: none;
+    color:       #1e293b;
+    border-bottom: 1px solid #e2e8f0;
+    transition:  background .15s;
+}
+.mai-conv-item:hover       { background: #f1f5f9; }
+.mai-conv-item.mai-conv-active { background: #eff6ff; border-left: 3px solid #6366f1; }
+.mai-conv-avatar {
+    width:         36px; height: 36px; border-radius: 50%;
+    background:    #6366f1; color: #fff;
+    display:       flex; align-items: center; justify-content: center;
+    font-weight:   700; font-size: 15px; flex-shrink: 0;
+}
+.mai-conv-info    { flex: 1; min-width: 0; }
+.mai-conv-name    { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.mai-conv-meta    { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mai-conv-ts      { font-size: 11px; color: #94a3b8; flex-shrink: 0; }
+.mai-conv-unread .mai-conv-name { font-weight: 700; }
+.mai-unread-badge {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #6366f1; flex-shrink: 0;
+}
+
+/* Conversation detail */
+.mai-conv-detail {
+    flex:           1;
+    display:        flex;
+    flex-direction: column;
+    overflow:       hidden;
+}
+
+.mai-detail-header {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    padding:         12px 16px;
+    border-bottom:   1px solid #e2e8f0;
+    background:      #fafafa;
+    flex-shrink:     0;
+}
+.mai-detail-visitor strong { display: block; font-size: 14px; }
+.mai-detail-visitor span   { font-size: 12px; color: #64748b; }
+.mai-detail-actions select { font-size: 13px; }
+
+/* Message thread */
+.mai-detail-messages {
+    flex:       1;
+    overflow-y: auto;
+    padding:    16px;
+    display:    flex;
+    flex-direction: column;
+    gap:        12px;
+}
+
+.mai-admin-bubble {
+    max-width:    70%;
+    padding:      10px 14px;
+    border-radius: 12px;
+    font-size:    13px;
+    line-height:  1.55;
+}
+.mai-bubble-visitor {
+    align-self: flex-start;
+    background: #f1f5f9;
+    border-bottom-left-radius: 3px;
+}
+.mai-bubble-admin,
+.mai-bubble-ai {
+    align-self: flex-end;
+    background: #eff6ff;
+    border-bottom-right-radius: 3px;
+}
+.mai-bubble-pending { border: 2px dashed #f59e0b; background: #fffbeb; }
+.mai-bubble-sender {
+    font-size:   11px;
+    font-weight: 700;
+    color:       #475569;
+    margin-bottom: 4px;
+    display:     flex;
+    align-items: center;
+    gap:         6px;
+}
+.mai-bubble-time    { font-weight: 400; color: #94a3b8; }
+.mai-bubble-text    { white-space: pre-wrap; word-break: break-word; }
+.mai-pending-label  { background: #fef3c7; color: #92400e; font-size: 10px; padding: 1px 6px; border-radius: 10px; }
+
+.mai-approve-btn {
+    margin-top: 8px !important;
+    background: #22c55e !important;
+    color: #fff !important;
+    border-color: transparent !important;
+}
+.mai-approve-btn:hover { filter: brightness(1.1); }
+
+.mai-admin-qr-list {
+    margin-top: 6px; font-size: 11px; color: #64748b;
+    display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+}
+.mai-admin-qr-chip {
+    background: #f1f5f9; border: 1px solid #e2e8f0;
+    border-radius: 12px; padding: 2px 8px; font-size: 11px;
+}
+
+/* Suggested reply box */
+.mai-suggestion-box {
+    padding:     12px 16px;
+    border-top:  1px solid #e2e8f0;
+    background:  #fafafa;
+    flex-shrink: 0;
+}
+.mai-suggestion-header {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    font-size:       12px;
+    font-weight:     600;
+    color:           #475569;
+    margin-bottom:   6px;
+}
+.mai-suggestion-textarea {
+    width:      100%;
+    resize:     vertical;
+    font-size:  13px;
+    border:     1px solid #e2e8f0;
+    border-radius: 6px;
+    padding:    8px;
+    box-sizing: border-box;
+    font-family: inherit;
+    min-height: 60px;
+    color: #1e293b;
+}
+.mai-suggestion-btns { margin-top: 6px; display: flex; justify-content: flex-end; }
+
+/* Reply area */
+.mai-reply-area {
+    display:     flex;
+    gap:         8px;
+    padding:     12px 16px;
+    border-top:  1px solid #e2e8f0;
+    background:  #fff;
+    flex-shrink: 0;
+    align-items: flex-end;
+}
+.mai-admin-reply-input {
+    flex:        1;
+    resize:      none;
+    font-size:   13px;
+    border:      1px solid #e2e8f0;
+    border-radius: 8px;
+    padding:     8px 12px;
+    box-sizing:  border-box;
+    font-family: inherit;
+    line-height: 1.5;
+    transition:  border-color .2s;
+}
+.mai-admin-reply-input:focus { border-color: #6366f1; outline: none; }
+
+/* Empty states */
+.mai-empty {
+    padding:    40px 20px;
+    text-align: center;
+    color:      #64748b;
+    font-size:  14px;
+}
+.mai-empty-detail {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Temperature output */
+#temperature { vertical-align: middle; }
+output { margin-left: 8px; font-size: 14px; font-weight: 600; }
+
+/* Spinner */
+.mai-spinner {
+    display:  inline-block;
+    width:    14px; height: 14px;
+    border:   2px solid #e2e8f0;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: mai-spin .6s linear infinite;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+@keyframes mai-spin { to { transform: rotate(360deg); } }

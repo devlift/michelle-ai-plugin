@@ -26,6 +26,8 @@
         hasOlder:       false,
         loadingOlder:   false,
         oldestMsgId:    null,
+        audioActive:    false,
+        audioScriptLoaded: false,
     };
 
     // Persist session across page loads
@@ -147,6 +149,7 @@
 
     function closeWidget() {
         if (!state.open) return;
+        if (state.audioActive) stopAudio();
         state.open = false;
         chatWindow.classList.remove('mai-opening');
         chatWindow.classList.add('mai-closing');
@@ -647,6 +650,81 @@
     }
 
     // -------------------------------------------------------------------------
+    // Audio conversations
+    // -------------------------------------------------------------------------
+    function loadAudioScript() {
+        return new Promise((resolve, reject) => {
+            if (state.audioScriptLoaded) { resolve(); return; }
+            const s = document.createElement('script');
+            s.src = 'https://elevenlabs.io/convai-widget/index.js';
+            s.async = true;
+            s.onload = () => { state.audioScriptLoaded = true; resolve(); };
+            s.onerror = () => reject(new Error('Failed to load audio component'));
+            document.head.appendChild(s);
+        });
+    }
+
+    async function startAudio() {
+        const panel     = document.getElementById('mai-audio-panel');
+        const container = document.getElementById('mai-audio-container');
+        const audioBtn  = document.getElementById('mai-audio-btn');
+        if (!panel || !container) return;
+
+        // Show audio panel, hide chat areas
+        state.audioActive = true;
+        panel.hidden = false;
+        if (messagesEl) messagesEl.hidden = true;
+        if (typingEl)   typingEl.hidden = true;
+        document.querySelector('.mai-input-area')?.classList.add('mai-hidden');
+        if (audioBtn) audioBtn.classList.add('mai-audio-active');
+
+        // Show loading state
+        container.innerHTML = '<div class="mai-audio-loading">Connecting voice...</div>';
+
+        try {
+            // Fetch signed URL from our backend
+            const res = await apiFetch('/audio/signed-url', 'GET');
+
+            // Load the ElevenLabs widget script
+            await loadAudioScript().catch(() => {
+                // If the npm package fails, try the official embed
+            });
+
+            // Create the convai widget element
+            const widget = document.createElement('elevenlabs-convai');
+            if (res.signed_url) {
+                widget.setAttribute('signed-url', res.signed_url);
+            } else if (res.agent_id) {
+                widget.setAttribute('agent-id', res.agent_id);
+            }
+
+            container.innerHTML = '';
+            container.appendChild(widget);
+        } catch (err) {
+            container.innerHTML = '<div class="mai-audio-error">Could not start voice session. Please try again.</div>';
+        }
+    }
+
+    function stopAudio() {
+        const panel     = document.getElementById('mai-audio-panel');
+        const container = document.getElementById('mai-audio-container');
+        const audioBtn  = document.getElementById('mai-audio-btn');
+
+        state.audioActive = false;
+
+        // Remove the widget element to end the session
+        if (container) container.innerHTML = '';
+        if (panel) panel.hidden = true;
+
+        // Restore chat areas
+        if (messagesEl) messagesEl.hidden = false;
+        document.querySelector('.mai-input-area')?.classList.remove('mai-hidden');
+        if (audioBtn) audioBtn.classList.remove('mai-audio-active');
+
+        requestAnimationFrame(() => scrollToBottom());
+    }
+
+    // -------------------------------------------------------------------------
     // Init
     // -------------------------------------------------------------------------
     function init() {
@@ -664,6 +742,13 @@
 
         fab.addEventListener('click', () => state.open ? closeWidget() : openWidget());
         document.getElementById('mai-close-btn')?.addEventListener('click', closeWidget);
+
+        // Audio buttons
+        document.getElementById('mai-audio-btn')?.addEventListener('click', () => {
+            if (state.audioActive) stopAudio();
+            else startAudio();
+        });
+        document.getElementById('mai-audio-back')?.addEventListener('click', stopAudio);
 
         if (chatEnabled && inputEl && sendBtn) {
             inputEl.addEventListener('keydown', (e) => {

@@ -6,8 +6,9 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 $s = Michelle_AI_Settings::all();
 
-// Mask API key
+// Mask API keys
 $api_key_display = $s['openai_api_key'] ? '••••••••' : '';
+$audio_key_display = $s['audio_api_key'] ? '••••••••' : '';
 ?>
 <div class="wrap mai-admin">
     <h1><?php esc_html_e( 'Michelle AI — Settings', 'michelle-ai-plugin' ); ?></h1>
@@ -20,6 +21,7 @@ $api_key_display = $s['openai_api_key'] ? '••••••••' : '';
         <a href="#branding" class="mai-tab mai-tab-active" data-tab="branding"><?php esc_html_e( 'Branding', 'michelle-ai-plugin' ); ?></a>
         <a href="#chat"     class="mai-tab" data-tab="chat"><?php esc_html_e( 'Chat', 'michelle-ai-plugin' ); ?></a>
         <a href="#ai"       class="mai-tab" data-tab="ai"><?php esc_html_e( 'AI', 'michelle-ai-plugin' ); ?></a>
+        <a href="#audio"      class="mai-tab" data-tab="audio"><?php esc_html_e( 'Audio', 'michelle-ai-plugin' ); ?></a>
         <a href="#extraction" class="mai-tab" data-tab="extraction"><?php esc_html_e( 'Data Collection', 'michelle-ai-plugin' ); ?></a>
         <a href="#contact"  class="mai-tab" data-tab="contact"><?php esc_html_e( 'Contact Form', 'michelle-ai-plugin' ); ?></a>
     </div>
@@ -166,6 +168,36 @@ $api_key_display = $s['openai_api_key'] ? '••••••••' : '';
                         <input type="range" id="temperature" name="temperature" value="<?php echo esc_attr( $s['temperature'] ); ?>" min="0" max="2" step="0.1" />
                         <output id="temperature_output"><?php echo esc_html( $s['temperature'] ); ?></output>
                         <p class="description"><?php esc_html_e( '0 = deterministic, 1 = creative. Recommended: 0.7', 'michelle-ai-plugin' ); ?></p>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- ── Audio ───────────────────────────────────────────────────── -->
+        <div class="mai-tab-panel" id="mai-tab-audio" hidden>
+            <table class="form-table">
+                <tr>
+                    <th><?php esc_html_e( 'Audio Conversations', 'michelle-ai-plugin' ); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="audio_enabled" value="1" <?php checked( $s['audio_enabled'] ); ?> />
+                            <?php esc_html_e( 'Enable voice conversations in the chat widget', 'michelle-ai-plugin' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( 'Adds a microphone button to the chat header for starting voice conversations.', 'michelle-ai-plugin' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="audio_agent_id"><?php esc_html_e( 'Agent ID', 'michelle-ai-plugin' ); ?></label></th>
+                    <td>
+                        <input type="text" id="audio_agent_id" name="audio_agent_id" value="<?php echo esc_attr( $s['audio_agent_id'] ); ?>" class="regular-text" />
+                        <p class="description"><?php esc_html_e( 'The voice agent identifier for audio conversations.', 'michelle-ai-plugin' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="audio_api_key"><?php esc_html_e( 'API Key', 'michelle-ai-plugin' ); ?></label></th>
+                    <td>
+                        <input type="password" id="audio_api_key" name="audio_api_key" value="<?php echo esc_attr( $audio_key_display ); ?>" class="large-text" autocomplete="new-password" />
+                        <p class="description"><?php esc_html_e( 'Your key is encrypted in the database. Paste a new key to update it.', 'michelle-ai-plugin' ); ?></p>
                     </td>
                 </tr>
             </table>

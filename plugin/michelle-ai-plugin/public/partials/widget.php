@@ -55,6 +55,16 @@ $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
                     </span>
                 </div>
             </div>
+            <?php if ( Michelle_AI_Settings::get( 'audio_enabled', false ) ) : ?>
+            <button class="mai-audio-btn" aria-label="Start voice conversation" id="mai-audio-btn" title="Voice conversation">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <?php endif; ?>
             <button class="mai-close-btn" aria-label="Close chat" id="mai-close-btn">
                 <!-- Chevron down icon -->
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -99,6 +109,19 @@ $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
                         <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
+            </div>
+        </div>
+
+        <!-- Audio panel (hidden by default, replaces chat when active) -->
+        <div id="mai-audio-panel" class="mai-audio-panel" hidden>
+            <button id="mai-audio-back" class="mai-audio-back-btn" aria-label="Back to chat">
+                <svg viewBox="0 0 24 24" fill="none" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Back to Chat
+            </button>
+            <div id="mai-audio-container" class="mai-audio-container">
+                <!-- ElevenLabs widget injected here by JS -->
             </div>
         </div>
 

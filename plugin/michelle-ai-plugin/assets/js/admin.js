@@ -69,7 +69,7 @@
                 data[key] = val;
             });
             // Explicitly handle unchecked checkboxes
-            ['chat_enabled','auto_reply','moderation_mode','notification_sound','extraction_enabled'].forEach(k => {
+            ['chat_enabled','auto_reply','moderation_mode','notification_sound','extraction_enabled','audio_enabled'].forEach(k => {
                 if (!(k in data)) data[k] = false;
                 else data[k] = true;
             });

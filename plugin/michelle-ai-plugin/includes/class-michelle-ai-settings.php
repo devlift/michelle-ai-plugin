@@ -38,6 +38,11 @@ class Michelle_AI_Settings {
             'context_messages' => 10,
             'temperature'      => 0.7,
 
+            // Audio
+            'audio_enabled'   => false,
+            'audio_api_key'   => '',
+            'audio_agent_id'  => '',
+
             // Data extraction
             'extraction_enabled'    => false,
             'extraction_properties' => [],
@@ -81,6 +86,9 @@ class Michelle_AI_Settings {
         if ( array_key_exists( 'openai_api_key', $data ) && $data['openai_api_key'] !== '' ) {
             $updated['openai_api_key'] = self::encrypt( $data['openai_api_key'] );
         }
+        if ( array_key_exists( 'audio_api_key', $data ) && $data['audio_api_key'] !== '' ) {
+            $updated['audio_api_key'] = self::encrypt( $data['audio_api_key'] );
+        }
         update_option( self::OPTION_KEY, $updated );
     }
 
@@ -89,6 +97,14 @@ class Michelle_AI_Settings {
      */
     public static function get_api_key() {
         $raw = self::get( 'openai_api_key', '' );
+        return $raw ? self::decrypt( $raw ) : '';
+    }
+
+    /**
+     * Get the decrypted audio API key.
+     */
+    public static function get_audio_api_key() {
+        $raw = self::get( 'audio_api_key', '' );
         return $raw ? self::decrypt( $raw ) : '';
     }
 

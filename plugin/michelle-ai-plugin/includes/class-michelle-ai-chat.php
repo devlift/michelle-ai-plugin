@@ -114,6 +114,13 @@ class Michelle_AI_Chat {
             ],
         ] );
 
+        // Audio signed URL (public, rate-limited)
+        register_rest_route( self::NS, '/audio/signed-url', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'audio_signed_url' ],
+            'permission_callback' => '__return_true',
+        ] );
+
         // Widget config (public — branding data for frontend)
         register_rest_route( self::NS, '/widget-config', [
             'methods'             => 'GET',
@@ -564,9 +571,12 @@ class Michelle_AI_Chat {
 
     public function admin_get_settings( $request ) {
         $settings = Michelle_AI_Settings::all();
-        // Mask API key
+        // Mask API keys
         if ( $settings['openai_api_key'] ) {
             $settings['openai_api_key'] = '••••••••';
+        }
+        if ( $settings['audio_api_key'] ) {
+            $settings['audio_api_key'] = '••••••••';
         }
         return rest_ensure_response( $settings );
     }
@@ -581,8 +591,11 @@ class Michelle_AI_Chat {
                 continue;
             }
             $val = $params[ $key ];
-            // Don't overwrite key if masked
+            // Don't overwrite keys if masked
             if ( $key === 'openai_api_key' && $val === '••••••••' ) {
+                continue;
+            }
+            if ( $key === 'audio_api_key' && $val === '••••••••' ) {
                 continue;
             }
             // Array fields (e.g. extraction_properties)
@@ -602,6 +615,58 @@ class Michelle_AI_Chat {
         return rest_ensure_response( [ 'ok' => true ] );
     }
 
+    public function audio_signed_url( $request ) {
+        // Rate limit: 10 requests per minute per IP
+        $ip    = sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' );
+        $key   = 'michelle_ai_audio_' . md5( $ip );
+        $count = (int) get_transient( $key );
+        if ( $count >= 10 ) {
+            return new WP_Error( 'rate_limited', 'Too many requests', [ 'status' => 429 ] );
+        }
+        set_transient( $key, $count + 1, MINUTE_IN_SECONDS );
+
+        $audio_enabled = (bool) Michelle_AI_Settings::get( 'audio_enabled', false );
+        if ( ! $audio_enabled ) {
+            return new WP_Error( 'disabled', 'Audio conversations are not enabled', [ 'status' => 403 ] );
+        }
+
+        $agent_id = Michelle_AI_Settings::get( 'audio_agent_id', '' );
+        if ( ! $agent_id ) {
+            return new WP_Error( 'not_configured', 'Audio is not fully configured', [ 'status' => 500 ] );
+        }
+
+        $api_key = Michelle_AI_Settings::get_audio_api_key();
+
+        // If we have an API key, fetch a signed URL for private agent access
+        if ( $api_key ) {
+            $url = 'https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=' . urlencode( $agent_id );
+            $response = wp_remote_get( $url, [
+                'headers' => [
+                    'xi-api-key' => $api_key,
+                ],
+                'timeout' => 10,
+            ] );
+
+            if ( is_wp_error( $response ) ) {
+                error_log( 'Michelle AI: Audio signed URL request failed — ' . $response->get_error_message() );
+                return new WP_Error( 'upstream_error', 'Could not obtain audio session', [ 'status' => 502 ] );
+            }
+
+            $code = wp_remote_retrieve_response_code( $response );
+            $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+            if ( $code >= 400 || empty( $body['signed_url'] ) ) {
+                error_log( 'Michelle AI: Audio signed URL HTTP ' . $code );
+                return new WP_Error( 'upstream_error', 'Could not obtain audio session', [ 'status' => 502 ] );
+            }
+
+            return rest_ensure_response( [ 'signed_url' => $body['signed_url'] ] );
+        }
+
+        // No API key — return agent_id for public agent fallback
+        return rest_ensure_response( [ 'agent_id' => $agent_id ] );
+    }
+
     public function widget_config( $request ) {
         $s = Michelle_AI_Settings::all();
         return rest_ensure_response( [
@@ -613,6 +678,7 @@ class Michelle_AI_Chat {
             'secondary_color' => $s['secondary_color'],
             'logo_url'        => $s['logo_url'],
             'fab_icon'        => $s['fab_icon'],
+            'audio_enabled'   => (bool) $s['audio_enabled'],
             // Contact form labels
             'form_title'         => $s['form_title'],
             'form_label_name'    => $s['form_label_name'],

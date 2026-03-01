@@ -36,6 +36,7 @@ class Michelle_AI_Public {
             'widgetTitle' => Michelle_AI_Settings::get( 'widget_title', 'Chat with us' ),
             'agentName'   => Michelle_AI_Settings::get( 'agent_name', 'Support' ),
             'logoUrl'     => Michelle_AI_Settings::get( 'logo_url', '' ),
+            'audioEnabled' => (bool) Michelle_AI_Settings::get( 'audio_enabled', false ),
         ] );
     }
 

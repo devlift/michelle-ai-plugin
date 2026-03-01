@@ -81,7 +81,16 @@ class Michelle_AI_AI {
         $payload_messages = [
             [
                 'role'    => 'system',
-                'content' => 'You generate short quick-reply button labels for a chat widget. Given the last assistant message, return exactly a JSON array of 2-3 concise reply options (under 40 chars each) that a visitor might want to click. Return ONLY the JSON array, no other text.',
+                'content' => 'You generate short quick-reply button labels for a chat widget. '
+                    . 'Given the last assistant message, decide whether quick-reply buttons make sense. '
+                    . 'ONLY generate replies when the assistant is asking a multiple-choice style question '
+                    . 'with a small set of obvious options (e.g. "Is this for yourself or your child?"). '
+                    . 'Do NOT generate replies when the assistant is asking for open-ended or personal input '
+                    . 'such as a name, email address, phone number, postal code, address, date of birth, age, '
+                    . 'or any other free-text answer the user must type themselves. '
+                    . 'If quick replies are appropriate, return a JSON array of 2-3 concise options (under 40 chars each). '
+                    . 'If quick replies are NOT appropriate, return an empty JSON array: []'
+                    . "\n\nReturn ONLY the JSON array, no other text.",
             ],
             [
                 'role'    => 'user',

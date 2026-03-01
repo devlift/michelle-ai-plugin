@@ -17,7 +17,7 @@ class Michelle_AI_Admin {
             'michelle-ai-admin',
             MICHELLE_AI_PLUGIN_URL . 'assets/css/admin.css',
             [],
-            MICHELLE_AI_VERSION
+            (string) filemtime( MICHELLE_AI_PLUGIN_DIR . 'assets/css/admin.css' )
         );
     }
 
@@ -29,7 +29,7 @@ class Michelle_AI_Admin {
             'michelle-ai-admin',
             MICHELLE_AI_PLUGIN_URL . 'assets/js/admin.js',
             [],
-            MICHELLE_AI_VERSION,
+            (string) filemtime( MICHELLE_AI_PLUGIN_DIR . 'assets/js/admin.js' ),
             true
         );
 

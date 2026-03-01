@@ -14,7 +14,7 @@ class Michelle_AI_Public {
             'michelle-ai-public',
             MICHELLE_AI_PLUGIN_URL . 'assets/css/public.css',
             [],
-            MICHELLE_AI_VERSION
+            (string) filemtime( MICHELLE_AI_PLUGIN_DIR . 'assets/css/public.css' )
         );
     }
 
@@ -23,7 +23,7 @@ class Michelle_AI_Public {
             'michelle-ai-public',
             MICHELLE_AI_PLUGIN_URL . 'assets/js/public.js',
             [],
-            MICHELLE_AI_VERSION,
+            (string) filemtime( MICHELLE_AI_PLUGIN_DIR . 'assets/js/public.js' ),
             true
         );
 

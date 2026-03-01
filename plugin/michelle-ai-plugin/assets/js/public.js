@@ -651,25 +651,26 @@
     }
 
     // -------------------------------------------------------------------------
-    // Audio conversations
+    // Audio conversations (ElevenLabs SDK + canvas waveform)
     // -------------------------------------------------------------------------
-    function loadAudioScript() {
-        return new Promise((resolve, reject) => {
-            if (state.audioScriptLoaded) { resolve(); return; }
-            const s = document.createElement('script');
-            s.src = 'https://elevenlabs.io/convai-widget/index.js';
-            s.async = true;
-            s.onload = () => { state.audioScriptLoaded = true; resolve(); };
-            s.onerror = () => reject(new Error('Failed to load audio component'));
-            document.head.appendChild(s);
-        });
+    let audioConversation = null;
+    let audioAnimFrame    = null;
+    let audioMode         = 'listening'; // 'listening' | 'speaking'
+    let audioMuted        = false;
+
+    async function loadElevenLabsSDK() {
+        if (state.audioScriptLoaded && window.__ElevenLabsConversation) return;
+        // Dynamic ESM import from CDN
+        const mod = await import('https://cdn.jsdelivr.net/npm/@11labs/client@latest/+esm');
+        window.__ElevenLabsConversation = mod.Conversation;
+        state.audioScriptLoaded = true;
     }
 
     async function startAudio() {
-        const panel     = document.getElementById('mai-audio-panel');
-        const container = document.getElementById('mai-audio-container');
-        const audioBtn  = document.getElementById('mai-audio-btn');
-        if (!panel || !container) return;
+        const panel    = document.getElementById('mai-audio-panel');
+        const audioBtn = document.getElementById('mai-audio-btn');
+        const modeLabel = document.getElementById('mai-mode-label');
+        if (!panel) return;
 
         // Show audio panel, hide chat areas
         state.audioActive = true;
@@ -678,43 +679,82 @@
         if (typingEl)   typingEl.hidden = true;
         document.querySelector('.mai-input-area')?.classList.add('mai-hidden');
         if (audioBtn) audioBtn.classList.add('mai-audio-active');
-
-        // Show loading state
-        container.innerHTML = '<div class="mai-audio-loading">Connecting voice...</div>';
+        if (modeLabel) modeLabel.textContent = 'Connecting...';
+        panel.dataset.mode = 'connecting';
 
         try {
+            // Request mic permission upfront
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+
             // Fetch signed URL from our backend
             const res = await apiFetch('/audio/signed-url', 'GET');
 
-            // Load the ElevenLabs widget script
-            await loadAudioScript().catch(() => {
-                // If the npm package fails, try the official embed
-            });
+            // Load SDK
+            await loadElevenLabsSDK();
+            const Conversation = window.__ElevenLabsConversation;
 
-            // Create the convai widget element
-            const widget = document.createElement('elevenlabs-convai');
+            // Start the conversation session
+            const sessionOpts = {
+                onConnect: () => {
+                    if (modeLabel) modeLabel.textContent = 'Listening...';
+                    panel.dataset.mode = 'listening';
+                    audioMode = 'listening';
+                },
+                onDisconnect: () => {
+                    stopAudio();
+                },
+                onModeChange: (mode) => {
+                    audioMode = mode.mode;
+                    if (modeLabel) {
+                        modeLabel.textContent = audioMode === 'speaking' ? 'Speaking...' : 'Listening...';
+                    }
+                    panel.dataset.mode = audioMode;
+                },
+                onError: (err) => {
+                    console.error('Audio session error:', err);
+                    if (modeLabel) modeLabel.textContent = 'Connection lost';
+                    panel.dataset.mode = 'error';
+                },
+            };
+
             if (res.signed_url) {
-                widget.setAttribute('signed-url', res.signed_url);
+                sessionOpts.signedUrl = res.signed_url;
             } else if (res.agent_id) {
-                widget.setAttribute('agent-id', res.agent_id);
+                sessionOpts.agentId = res.agent_id;
             }
 
-            container.innerHTML = '';
-            container.appendChild(widget);
+            audioConversation = await Conversation.startSession(sessionOpts);
+            audioMuted = false;
+
+            // Start waveform animation
+            startWaveform();
+
         } catch (err) {
-            container.innerHTML = '<div class="mai-audio-error">Could not start voice session. Please try again.</div>';
+            console.error('Failed to start audio:', err);
+            if (modeLabel) modeLabel.textContent = 'Could not connect';
+            panel.dataset.mode = 'error';
         }
     }
 
     function stopAudio() {
-        const panel     = document.getElementById('mai-audio-panel');
-        const container = document.getElementById('mai-audio-container');
-        const audioBtn  = document.getElementById('mai-audio-btn');
+        const panel    = document.getElementById('mai-audio-panel');
+        const audioBtn = document.getElementById('mai-audio-btn');
+
+        // Stop waveform animation
+        if (audioAnimFrame) {
+            cancelAnimationFrame(audioAnimFrame);
+            audioAnimFrame = null;
+        }
+
+        // End the SDK session
+        if (audioConversation) {
+            try { audioConversation.endSession(); } catch (e) {}
+            audioConversation = null;
+        }
 
         state.audioActive = false;
+        audioMuted = false;
 
-        // Remove the widget element to end the session
-        if (container) container.innerHTML = '';
         if (panel) panel.hidden = true;
 
         // Restore chat areas
@@ -722,7 +762,155 @@
         document.querySelector('.mai-input-area')?.classList.remove('mai-hidden');
         if (audioBtn) audioBtn.classList.remove('mai-audio-active');
 
+        // Reset mute button
+        const muteBtn = document.getElementById('mai-audio-mute');
+        if (muteBtn) {
+            muteBtn.querySelector('.mai-mute-off').hidden = false;
+            muteBtn.querySelector('.mai-mute-on').hidden = true;
+        }
+
         requestAnimationFrame(() => scrollToBottom());
+    }
+
+    function toggleMute() {
+        if (!audioConversation) return;
+        audioMuted = !audioMuted;
+        audioConversation.setMicMuted(audioMuted);
+
+        const muteBtn = document.getElementById('mai-audio-mute');
+        if (muteBtn) {
+            muteBtn.querySelector('.mai-mute-off').hidden = audioMuted;
+            muteBtn.querySelector('.mai-mute-on').hidden = !audioMuted;
+            muteBtn.title = audioMuted ? 'Unmute' : 'Mute';
+        }
+    }
+
+    // ── Canvas waveform visualization ────────────────────────────────────
+    function startWaveform() {
+        const canvas = document.getElementById('mai-waveform');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+
+        function resize() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width  = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            canvas.style.width  = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            ctx.scale(dpr, dpr);
+        }
+        resize();
+
+        const primaryColor = getComputedStyle(document.documentElement)
+            .getPropertyValue('--mai-primary').trim() || '#6366f1';
+
+        function draw() {
+            audioAnimFrame = requestAnimationFrame(draw);
+
+            const w = canvas.width / dpr;
+            const h = canvas.height / dpr;
+            ctx.clearRect(0, 0, w, h);
+
+            if (!audioConversation) return;
+
+            // Get frequency data based on current mode
+            let freqData;
+            try {
+                freqData = audioMode === 'speaking'
+                    ? audioConversation.getOutputByteFrequencyData()
+                    : audioConversation.getInputByteFrequencyData();
+            } catch (e) {
+                return;
+            }
+
+            if (!freqData || !freqData.length) {
+                // Fallback: draw idle pulse using volume
+                let vol = 0;
+                try {
+                    vol = audioMode === 'speaking'
+                        ? audioConversation.getOutputVolume()
+                        : audioConversation.getInputVolume();
+                } catch (e) {}
+                drawIdlePulse(ctx, w, h, vol, primaryColor);
+                return;
+            }
+
+            drawFrequencyBars(ctx, freqData, w, h, primaryColor);
+        }
+
+        draw();
+    }
+
+    function drawFrequencyBars(ctx, data, w, h, color) {
+        const barWidth = 3;
+        const gap      = 2;
+        const totalBarW = barWidth + gap;
+        const barCount = Math.min(Math.floor(w / totalBarW), data.length);
+        const startIdx = Math.floor((data.length - barCount) / 2);
+        const startX   = (w - barCount * totalBarW) / 2;
+        const centerY  = h / 2;
+        const maxBarH  = h * 0.8;
+
+        // Parse color for alpha
+        ctx.fillStyle = color;
+
+        for (let i = 0; i < barCount; i++) {
+            const val = data[startIdx + i] / 255;
+            const barH = Math.max(2, val * maxBarH);
+
+            // Fade edges
+            const progress = i / barCount;
+            const edgeFade = Math.min(progress * 4, (1 - progress) * 4, 1);
+
+            ctx.globalAlpha = 0.3 + val * 0.7 * edgeFade;
+            const x = startX + i * totalBarW;
+            const radius = barWidth / 2;
+
+            // Draw rounded bar (symmetric from center)
+            roundRect(ctx, x, centerY - barH / 2, barWidth, barH, radius);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    function drawIdlePulse(ctx, w, h, volume, color) {
+        const centerY = h / 2;
+        const barWidth = 3;
+        const gap = 2;
+        const barCount = 32;
+        const totalW = barCount * (barWidth + gap);
+        const startX = (w - totalW) / 2;
+
+        ctx.fillStyle = color;
+
+        for (let i = 0; i < barCount; i++) {
+            // Create gentle sine wave + volume response
+            const t = Date.now() / 600;
+            const progress = i / barCount;
+            const sine = Math.sin(t + i * 0.3) * 0.5 + 0.5;
+            const edgeFade = Math.min(progress * 4, (1 - progress) * 4, 1);
+            const barH = Math.max(2, (2 + sine * 8 + volume * 30) * edgeFade);
+
+            ctx.globalAlpha = 0.2 + sine * 0.3 * edgeFade;
+            roundRect(ctx, startX + i * (barWidth + gap), centerY - barH / 2, barWidth, barH, barWidth / 2);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+        r = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
     }
 
     // -------------------------------------------------------------------------
@@ -750,6 +938,8 @@
             else startAudio();
         });
         document.getElementById('mai-audio-back')?.addEventListener('click', stopAudio);
+        document.getElementById('mai-audio-end')?.addEventListener('click', stopAudio);
+        document.getElementById('mai-audio-mute')?.addEventListener('click', toggleMute);
 
         if (chatEnabled && inputEl && sendBtn) {
             inputEl.addEventListener('keydown', (e) => {

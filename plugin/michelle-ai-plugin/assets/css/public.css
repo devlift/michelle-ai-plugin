@@ -555,6 +555,8 @@
 /* =========================================================================
    Audio
    ========================================================================= */
+
+/* Header mic button */
 .mai-audio-btn {
     background: rgba(255,255,255,.1);
     border: none;
@@ -577,49 +579,101 @@
     color: #fff;
 }
 
+/* Audio panel — replaces chat when active */
 .mai-audio-panel {
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    background: var(--mai-bg);
 }
-.mai-audio-back-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: none;
-    border: none;
-    color: var(--mai-muted);
-    cursor: pointer;
-    font-size: 13px;
-    padding: 12px 16px;
-    transition: color .2s;
-    flex-shrink: 0;
-}
-.mai-audio-back-btn:hover { color: var(--mai-text); }
 
-.mai-audio-container {
+/* Waveform area */
+.mai-audio-visual {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px 16px;
+    min-height: 0;
+}
+.mai-waveform {
+    width: 100%;
+    height: 80px;
+    display: block;
+}
+
+/* Mode indicator */
+.mai-audio-mode {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--mai-muted);
+    font-weight: 500;
+}
+.mai-mode-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--mai-muted);
+    transition: background .3s;
+}
+[data-mode="listening"] .mai-mode-dot { background: var(--mai-primary); animation: mai-pulse 1.5s ease-in-out infinite; }
+[data-mode="speaking"]  .mai-mode-dot { background: #22c55e; animation: mai-pulse 1s ease-in-out infinite; }
+[data-mode="connecting"] .mai-mode-dot { background: #f59e0b; animation: mai-pulse 1s ease-in-out infinite; }
+[data-mode="error"] .mai-mode-dot { background: #ef4444; }
+
+@keyframes mai-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: .5; transform: scale(1.3); }
+}
+
+/* Control bar */
+.mai-audio-controls {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 16px;
     padding: 16px;
-    min-height: 0;
+    border-top: 1px solid var(--mai-border);
+    flex-shrink: 0;
 }
-.mai-audio-container elevenlabs-convai {
-    width: 100%;
-    height: 100%;
-}
-
-.mai-audio-loading,
-.mai-audio-error {
-    text-align: center;
-    font-size: 13px;
+.mai-audio-control-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--mai-border);
+    background: var(--mai-bg);
     color: var(--mai-muted);
-    padding: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s, color .2s, border-color .2s;
 }
-.mai-audio-error { color: #ef4444; }
+.mai-audio-control-btn:hover {
+    background: var(--mai-bg-light);
+    color: var(--mai-text);
+    border-color: var(--mai-muted);
+}
+.mai-audio-end-btn {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    border: none;
+    background: #ef4444;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s, transform .15s;
+}
+.mai-audio-end-btn:hover {
+    background: #dc2626;
+    transform: scale(1.05);
+}
 
 .mai-hidden { display: none !important; }
 

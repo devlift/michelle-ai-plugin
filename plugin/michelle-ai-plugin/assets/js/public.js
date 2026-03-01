@@ -181,7 +181,8 @@
                     }
                 });
                 state.lastPollTime = msgs[msgs.length - 1].created_at;
-                state.oldestMsgId  = msgs[0].id;
+                // Only enable infinite scroll if there are older messages
+                state.oldestMsgId  = resp.has_older ? msgs[0].id : null;
             }
             scrollToBottom();
             startPolling();

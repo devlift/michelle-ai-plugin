@@ -196,8 +196,8 @@ class Michelle_AI_Chat {
         $before_id = $request->get_param( 'before' ) ? (int) $request->get_param( 'before' ) : null;
         $limit     = $request->get_param( 'limit' ) ? (int) $request->get_param( 'limit' ) : null;
 
-        if ( $before_id ) {
-            // Paginated "load older" request
+        if ( $before_id || $limit ) {
+            // Paginated request — initial load (limit only) or "load older" (before + limit)
             $rows    = Michelle_AI_DB::get_messages_page( $conv_id, $limit ?: 30, $before_id );
             $visible = array_filter( $rows, fn( $r ) => ! $r->is_pending_mod );
             return rest_ensure_response( [

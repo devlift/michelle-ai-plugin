@@ -580,6 +580,7 @@
 }
 
 /* Audio panel — compact bottom bar (replaces input area when voice active) */
+.mai-audio-panel[hidden] { display: none !important; }
 .mai-audio-panel {
     display: flex;
     align-items: center;

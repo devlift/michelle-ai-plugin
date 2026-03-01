@@ -677,13 +677,9 @@
         const modeLabel = document.getElementById('mai-mode-label');
         if (!panel) return;
 
-        // Show audio bar at bottom, hide text input — messages stay visible
+        // Mark as active but don't show panel yet — wait for onConnect
         state.audioActive = true;
-        panel.hidden = false;
-        document.querySelector('.mai-input-area')?.classList.add('mai-hidden');
         if (audioBtn) audioBtn.classList.add('mai-audio-active');
-        if (modeLabel) modeLabel.textContent = 'Connecting...';
-        if (modeEl) modeEl.dataset.mode = 'connecting';
 
         try {
             // Request mic permission upfront
@@ -699,9 +695,13 @@
             // Start the conversation session
             const sessionOpts = {
                 onConnect: () => {
+                    // NOW show the audio bar and hide the text input
+                    panel.hidden = false;
+                    document.querySelector('.mai-input-area')?.classList.add('mai-hidden');
                     if (modeLabel) modeLabel.textContent = 'Listening...';
                     if (modeEl) modeEl.dataset.mode = 'listening';
                     audioMode = 'listening';
+                    startWaveform();
                 },
                 onDisconnect: () => {
                     stopAudio();
@@ -737,14 +737,10 @@
             audioConversation = await Conversation.startSession(sessionOpts);
             audioMuted = false;
 
-            // Start waveform animation
-            startWaveform();
-
         } catch (err) {
             console.error('Failed to start audio:', err);
-            const msg = err.message || 'Could not connect';
-            if (modeLabel) modeLabel.textContent = msg;
-            if (modeEl) modeEl.dataset.mode = 'error';
+            // If panel was never shown (connection failed), clean up
+            stopAudio();
         }
     }
 
@@ -830,8 +826,7 @@
         // Reset mute button
         const muteBtn = document.getElementById('mai-audio-mute');
         if (muteBtn) {
-            muteBtn.querySelector('.mai-mute-off').hidden = false;
-            muteBtn.querySelector('.mai-mute-on').hidden = true;
+            muteBtn.classList.remove('mai-muted');
         }
 
         requestAnimationFrame(() => scrollToBottom());
@@ -844,9 +839,9 @@
 
         const muteBtn = document.getElementById('mai-audio-mute');
         if (muteBtn) {
-            muteBtn.querySelector('.mai-mute-off').hidden = audioMuted;
-            muteBtn.querySelector('.mai-mute-on').hidden = !audioMuted;
+            muteBtn.classList.toggle('mai-muted', audioMuted);
             muteBtn.title = audioMuted ? 'Unmute' : 'Mute';
+            muteBtn.setAttribute('aria-label', audioMuted ? 'Unmute microphone' : 'Mute microphone');
         }
     }
 

@@ -655,6 +655,11 @@
     color: var(--mai-text);
     border-color: var(--mai-muted);
 }
+/* Mute icon toggling — only show one at a time */
+#mai-audio-mute .mai-mute-on  { display: none; }
+#mai-audio-mute.mai-muted .mai-mute-off { display: none; }
+#mai-audio-mute.mai-muted .mai-mute-on  { display: block; }
+
 .mai-audio-end-btn {
     width: 36px; height: 36px;
     border-radius: 50%;

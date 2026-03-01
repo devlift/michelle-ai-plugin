@@ -112,34 +112,35 @@ $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
             </div>
         </div>
 
-        <!-- Audio bar (hidden by default, replaces input area when voice active) -->
+        <!-- Audio bar (hidden by default, replaces input area once voice connected) -->
         <div id="mai-audio-panel" class="mai-audio-panel" hidden>
             <div class="mai-audio-bar">
                 <canvas id="mai-waveform" class="mai-waveform"></canvas>
-                <div id="mai-audio-mode" class="mai-audio-mode" data-mode="connecting">
+                <div id="mai-audio-mode" class="mai-audio-mode" data-mode="listening">
                     <span class="mai-mode-dot"></span>
-                    <span id="mai-mode-label">Connecting...</span>
+                    <span id="mai-mode-label">Listening...</span>
                 </div>
             </div>
             <div class="mai-audio-controls">
                 <button id="mai-audio-mute" class="mai-audio-control-btn" aria-label="Mute microphone" title="Mute">
-                    <svg class="mai-mute-off" viewBox="0 0 24 24" fill="none" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <!-- Mic icon (unmuted state) -->
+                    <svg class="mai-mute-off" viewBox="0 0 24 24" fill="none" width="18" height="18">
+                        <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" stroke-width="2"/>
+                        <path d="M5 10v1a7 7 0 0 0 14 0v-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M12 19v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                    <svg class="mai-mute-on" viewBox="0 0 24 24" fill="none" width="18" height="18" xmlns="http://www.w3.org/2000/svg" hidden>
-                        <path d="M15 9.34V4a3 3 0 0 0-5.94-.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <path d="M9 9v3a3 3 0 0 0 5.12 2.12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <path d="M19 10v2a7 7 0 0 1-12 4.9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <!-- Mic-off icon (muted state) -->
+                    <svg class="mai-mute-on" viewBox="0 0 24 24" fill="none" width="18" height="18">
+                        <path d="M15 9.34V4a3 3 0 0 0-5.94-.6M9 9v3a3 3 0 0 0 5.12 2.12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M19 10v1a7 7 0 0 1-12.4 4.49" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M12 19v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </button>
                 <button id="mai-audio-end" class="mai-audio-end-btn" aria-label="End voice call" title="End call">
-                    <svg viewBox="0 0 24 24" fill="none" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M10.68 13.31a16 16 0 0 1-2.47-2.47l1.34-1.34a2 2 0 0 0 .38-2.22L8.66 4.73a2 2 0 0 0-2.22-.92l-2.12.53A2 2 0 0 0 2.79 6.3c.4 5.17 2.86 9.84 6.61 13.14a19.9 19.9 0 0 0 8.3 4.27 2 2 0 0 0 1.96-1.53l.53-2.12a2 2 0 0 0-.92-2.22l-2.55-1.27a2 2 0 0 0-2.22.38l-1.34 1.34a16 16 0 0 1-1.26-.98Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <!-- Simple X to end -->
+                    <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
                     </svg>
                 </button>
             </div>

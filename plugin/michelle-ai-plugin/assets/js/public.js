@@ -666,21 +666,24 @@
         state.audioScriptLoaded = true;
     }
 
+    // Track the streaming agent bubble during audio transcription
+    let audioAgentBubble = null;
+    let audioAgentText   = '';
+
     async function startAudio() {
-        const panel    = document.getElementById('mai-audio-panel');
-        const audioBtn = document.getElementById('mai-audio-btn');
+        const panel     = document.getElementById('mai-audio-panel');
+        const audioBtn  = document.getElementById('mai-audio-btn');
+        const modeEl    = document.getElementById('mai-audio-mode');
         const modeLabel = document.getElementById('mai-mode-label');
         if (!panel) return;
 
-        // Show audio panel, hide chat areas
+        // Show audio bar at bottom, hide text input — messages stay visible
         state.audioActive = true;
         panel.hidden = false;
-        if (messagesEl) messagesEl.hidden = true;
-        if (typingEl)   typingEl.hidden = true;
         document.querySelector('.mai-input-area')?.classList.add('mai-hidden');
         if (audioBtn) audioBtn.classList.add('mai-audio-active');
         if (modeLabel) modeLabel.textContent = 'Connecting...';
-        panel.dataset.mode = 'connecting';
+        if (modeEl) modeEl.dataset.mode = 'connecting';
 
         try {
             // Request mic permission upfront
@@ -697,7 +700,7 @@
             const sessionOpts = {
                 onConnect: () => {
                     if (modeLabel) modeLabel.textContent = 'Listening...';
-                    panel.dataset.mode = 'listening';
+                    if (modeEl) modeEl.dataset.mode = 'listening';
                     audioMode = 'listening';
                 },
                 onDisconnect: () => {
@@ -708,12 +711,20 @@
                     if (modeLabel) {
                         modeLabel.textContent = audioMode === 'speaking' ? 'Speaking...' : 'Listening...';
                     }
-                    panel.dataset.mode = audioMode;
+                    if (modeEl) modeEl.dataset.mode = audioMode;
+
+                    // When agent stops speaking, finalize any in-progress agent bubble
+                    if (audioMode === 'listening' && audioAgentBubble) {
+                        finalizeAudioAgentBubble();
+                    }
+                },
+                onMessage: (data) => {
+                    handleAudioTranscript(data);
                 },
                 onError: (err) => {
                     console.error('Audio session error:', err);
                     if (modeLabel) modeLabel.textContent = 'Connection lost';
-                    panel.dataset.mode = 'error';
+                    if (modeEl) modeEl.dataset.mode = 'error';
                 },
             };
 
@@ -733,8 +744,59 @@
             console.error('Failed to start audio:', err);
             const msg = err.message || 'Could not connect';
             if (modeLabel) modeLabel.textContent = msg;
-            panel.dataset.mode = 'error';
+            if (modeEl) modeEl.dataset.mode = 'error';
         }
+    }
+
+    /**
+     * Handle real-time transcript messages from the audio session.
+     * source: "ai" (agent) or "user" (caller)
+     */
+    function handleAudioTranscript(data) {
+        const { source, message } = data;
+        if (!message || !message.trim()) return;
+
+        if (source === 'user') {
+            // Finalize any pending agent bubble first
+            if (audioAgentBubble) finalizeAudioAgentBubble();
+
+            // Append user transcript as a visitor bubble
+            appendMessage({
+                id:          Date.now(),
+                sender_type: 'visitor',
+                content:     message,
+                created_at:  new Date().toISOString(),
+            });
+        } else if (source === 'ai') {
+            // Agent transcript — update or create a streaming bubble
+            if (!audioAgentBubble) {
+                audioAgentText = message;
+                audioAgentBubble = createStreamingBubble();
+                audioAgentBubble.innerHTML = renderMd(message);
+            } else {
+                audioAgentText = message;
+                audioAgentBubble.innerHTML = renderMd(message);
+            }
+            scrollToBottom();
+        }
+    }
+
+    /** Finalize the current agent streaming bubble with a timestamp */
+    function finalizeAudioAgentBubble() {
+        if (!audioAgentBubble) return;
+        const wrap = document.getElementById('mai-streaming-bubble');
+        if (wrap) {
+            wrap.removeAttribute('id');
+            const content = wrap.querySelector('.mai-msg-content');
+            if (content) {
+                const meta = document.createElement('div');
+                meta.className = 'mai-msg-meta';
+                meta.textContent = (cfg.agentName || 'Support') + ' \u00B7 ' + formatTime(null);
+                content.appendChild(meta);
+            }
+        }
+        audioAgentBubble = null;
+        audioAgentText   = '';
     }
 
     function stopAudio() {
@@ -753,13 +815,15 @@
             audioConversation = null;
         }
 
+        // Finalize any pending agent bubble
+        if (audioAgentBubble) finalizeAudioAgentBubble();
+
         state.audioActive = false;
         audioMuted = false;
 
         if (panel) panel.hidden = true;
 
-        // Restore chat areas
-        if (messagesEl) messagesEl.hidden = false;
+        // Restore text input
         document.querySelector('.mai-input-area')?.classList.remove('mai-hidden');
         if (audioBtn) audioBtn.classList.remove('mai-audio-active');
 
@@ -938,7 +1002,6 @@
             if (state.audioActive) stopAudio();
             else startAudio();
         });
-        document.getElementById('mai-audio-back')?.addEventListener('click', stopAudio);
         document.getElementById('mai-audio-end')?.addEventListener('click', stopAudio);
         document.getElementById('mai-audio-mute')?.addEventListener('click', toggleMute);
 

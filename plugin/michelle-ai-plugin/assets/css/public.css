@@ -579,29 +579,29 @@
     color: #fff;
 }
 
-/* Audio panel — replaces chat when active */
+/* Audio panel — compact bottom bar (replaces input area when voice active) */
 .mai-audio-panel {
     display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
     background: var(--mai-bg);
+    border-top: 1px solid var(--mai-border);
+    flex-shrink: 0;
 }
 
-/* Waveform area */
-.mai-audio-visual {
+/* Waveform + mode indicator bar */
+.mai-audio-bar {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 32px 16px 16px;
-    min-height: 0;
+    gap: 4px;
+    min-width: 0;
 }
 .mai-waveform {
     width: 100%;
-    height: 80px;
+    height: 36px;
     display: block;
 }
 
@@ -609,40 +609,36 @@
 .mai-audio-mode {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 16px;
-    font-size: 13px;
+    gap: 6px;
+    font-size: 11px;
     color: var(--mai-muted);
     font-weight: 500;
 }
 .mai-mode-dot {
-    width: 8px; height: 8px;
+    width: 6px; height: 6px;
     border-radius: 50%;
     background: var(--mai-muted);
     transition: background .3s;
 }
-[data-mode="listening"] .mai-mode-dot { background: var(--mai-primary); animation: mai-pulse 1.5s ease-in-out infinite; }
-[data-mode="speaking"]  .mai-mode-dot { background: #22c55e; animation: mai-pulse 1s ease-in-out infinite; }
-[data-mode="connecting"] .mai-mode-dot { background: #f59e0b; animation: mai-pulse 1s ease-in-out infinite; }
+[data-mode="listening"] .mai-mode-dot { background: var(--mai-primary); animation: mai-audio-pulse 1.5s ease-in-out infinite; }
+[data-mode="speaking"]  .mai-mode-dot { background: #22c55e; animation: mai-audio-pulse 1s ease-in-out infinite; }
+[data-mode="connecting"] .mai-mode-dot { background: #f59e0b; animation: mai-audio-pulse 1s ease-in-out infinite; }
 [data-mode="error"] .mai-mode-dot { background: #ef4444; }
 
-@keyframes mai-pulse {
+@keyframes mai-audio-pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
-    50%      { opacity: .5; transform: scale(1.3); }
+    50%      { opacity: .5; transform: scale(1.4); }
 }
 
-/* Control bar */
+/* Control buttons */
 .mai-audio-controls {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 16px;
-    padding: 16px;
-    border-top: 1px solid var(--mai-border);
+    gap: 8px;
     flex-shrink: 0;
 }
 .mai-audio-control-btn {
-    width: 40px; height: 40px;
+    width: 36px; height: 36px;
     border-radius: 50%;
     border: 1px solid var(--mai-border);
     background: var(--mai-bg);
@@ -652,6 +648,7 @@
     align-items: center;
     justify-content: center;
     transition: background .2s, color .2s, border-color .2s;
+    padding: 0;
 }
 .mai-audio-control-btn:hover {
     background: var(--mai-bg-light);
@@ -659,7 +656,7 @@
     border-color: var(--mai-muted);
 }
 .mai-audio-end-btn {
-    width: 52px; height: 52px;
+    width: 36px; height: 36px;
     border-radius: 50%;
     border: none;
     background: #ef4444;
@@ -669,6 +666,7 @@
     align-items: center;
     justify-content: center;
     transition: background .2s, transform .15s;
+    padding: 0;
 }
 .mai-audio-end-btn:hover {
     background: #dc2626;

@@ -112,38 +112,33 @@ $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
             </div>
         </div>
 
-        <!-- Audio panel (hidden by default, replaces chat when active) -->
+        <!-- Audio bar (hidden by default, replaces input area when voice active) -->
         <div id="mai-audio-panel" class="mai-audio-panel" hidden>
-            <div class="mai-audio-visual">
+            <div class="mai-audio-bar">
                 <canvas id="mai-waveform" class="mai-waveform"></canvas>
-                <div id="mai-audio-mode" class="mai-audio-mode">
+                <div id="mai-audio-mode" class="mai-audio-mode" data-mode="connecting">
                     <span class="mai-mode-dot"></span>
                     <span id="mai-mode-label">Connecting...</span>
                 </div>
             </div>
             <div class="mai-audio-controls">
-                <button id="mai-audio-back" class="mai-audio-control-btn" aria-label="Back to chat" title="Back to chat">
-                    <svg viewBox="0 0 24 24" fill="none" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <button id="mai-audio-end" class="mai-audio-end-btn" aria-label="End voice call" title="End call">
-                    <svg viewBox="0 0 24 24" fill="none" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M10.68 13.31a16 16 0 0 1-2.47-2.47l1.34-1.34a2 2 0 0 0 .38-2.22L8.66 4.73a2 2 0 0 0-2.22-.92l-2.12.53A2 2 0 0 0 2.79 6.3c.4 5.17 2.86 9.84 6.61 13.14a19.9 19.9 0 0 0 8.3 4.27 2 2 0 0 0 1.96-1.53l.53-2.12a2 2 0 0 0-.92-2.22l-2.55-1.27a2 2 0 0 0-2.22.38l-1.34 1.34a16 16 0 0 1-1.26-.98Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                </button>
                 <button id="mai-audio-mute" class="mai-audio-control-btn" aria-label="Mute microphone" title="Mute">
-                    <svg class="mai-mute-off" viewBox="0 0 24 24" fill="none" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                    <svg class="mai-mute-off" viewBox="0 0 24 24" fill="none" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                    <svg class="mai-mute-on" viewBox="0 0 24 24" fill="none" width="20" height="20" xmlns="http://www.w3.org/2000/svg" hidden>
+                    <svg class="mai-mute-on" viewBox="0 0 24 24" fill="none" width="18" height="18" xmlns="http://www.w3.org/2000/svg" hidden>
                         <path d="M15 9.34V4a3 3 0 0 0-5.94-.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                         <path d="M9 9v3a3 3 0 0 0 5.12 2.12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                         <path d="M19 10v2a7 7 0 0 1-12 4.9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                         <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+                <button id="mai-audio-end" class="mai-audio-end-btn" aria-label="End voice call" title="End call">
+                    <svg viewBox="0 0 24 24" fill="none" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M10.68 13.31a16 16 0 0 1-2.47-2.47l1.34-1.34a2 2 0 0 0 .38-2.22L8.66 4.73a2 2 0 0 0-2.22-.92l-2.12.53A2 2 0 0 0 2.79 6.3c.4 5.17 2.86 9.84 6.61 13.14a19.9 19.9 0 0 0 8.3 4.27 2 2 0 0 0 1.96-1.53l.53-2.12a2 2 0 0 0-.92-2.22l-2.55-1.27a2 2 0 0 0-2.22.38l-1.34 1.34a16 16 0 0 1-1.26-.98Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </button>

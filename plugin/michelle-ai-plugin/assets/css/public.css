@@ -300,6 +300,9 @@
     line-height: 1.55;
     font-size: 14px;
 }
+.mai-bubble strong { font-weight: 600; }
+.mai-bubble em     { font-style: italic; }
+.mai-bubble code   { background: rgba(0,0,0,.06); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
 .mai-from-visitor .mai-bubble {
     background: var(--mai-primary);
     color: #fff;

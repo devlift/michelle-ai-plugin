@@ -56,6 +56,20 @@
         return d.innerHTML;
     }
 
+    /** Lightweight markdown → HTML (escapes first to prevent XSS). */
+    function renderMd(str) {
+        let html = esc(str);
+        // Bold: **text**
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        // Italic: *text* (but not inside bold)
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        // Inline code: `text`
+        html = html.replace(/`(.+?)`/g, '<code>$1</code>');
+        // Line breaks
+        html = html.replace(/\n/g, '<br>');
+        return html;
+    }
+
     function formatTime(isoStr) {
         const d = isoStr ? new Date(isoStr) : new Date();
         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -214,7 +228,7 @@
 
         const bubble = document.createElement('div');
         bubble.className = 'mai-bubble';
-        bubble.textContent = msg.content;
+        bubble.innerHTML = renderMd(msg.content);
 
         const meta = document.createElement('div');
         meta.className = 'mai-msg-meta';
@@ -380,7 +394,7 @@
                     bubble = createStreamingBubble();
                 }
                 fullText += data.token;
-                bubble.textContent = fullText;
+                bubble.innerHTML = renderMd(fullText);
                 scrollToBottom();
             }
 
@@ -606,7 +620,7 @@
 
         const bubble = document.createElement('div');
         bubble.className = 'mai-bubble';
-        bubble.textContent = msg.content;
+        bubble.innerHTML = renderMd(msg.content);
 
         const meta = document.createElement('div');
         meta.className = 'mai-msg-meta';

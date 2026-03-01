@@ -656,8 +656,13 @@ class Michelle_AI_Chat {
             $body = json_decode( wp_remote_retrieve_body( $response ), true );
 
             if ( $code >= 400 || empty( $body['signed_url'] ) ) {
-                error_log( 'Michelle AI: Audio signed URL HTTP ' . $code );
-                return new WP_Error( 'upstream_error', 'Could not obtain audio session', [ 'status' => 502 ] );
+                $detail = $body['detail']['message'] ?? ( $body['detail'] ?? '' );
+                error_log( 'Michelle AI: Audio signed URL HTTP ' . $code . ' — ' . ( is_string( $detail ) ? $detail : wp_json_encode( $detail ) ) );
+                $client_msg = 'Could not obtain audio session';
+                if ( $code === 401 || $code === 403 ) {
+                    $client_msg = 'Audio API key is invalid or missing required permissions';
+                }
+                return new WP_Error( 'upstream_error', $client_msg, [ 'status' => 502 ] );
             }
 
             return rest_ensure_response( [ 'signed_url' => $body['signed_url'] ] );

@@ -731,7 +731,8 @@
 
         } catch (err) {
             console.error('Failed to start audio:', err);
-            if (modeLabel) modeLabel.textContent = 'Could not connect';
+            const msg = err.message || 'Could not connect';
+            if (modeLabel) modeLabel.textContent = msg;
             panel.dataset.mode = 'error';
         }
     }

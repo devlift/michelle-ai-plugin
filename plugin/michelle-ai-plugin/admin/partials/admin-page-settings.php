@@ -197,7 +197,7 @@ $audio_key_display = $s['audio_api_key'] ? '••••••••' : '';
                     <th><label for="audio_api_key"><?php esc_html_e( 'API Key', 'michelle-ai-plugin' ); ?></label></th>
                     <td>
                         <input type="password" id="audio_api_key" name="audio_api_key" value="<?php echo esc_attr( $audio_key_display ); ?>" class="large-text" autocomplete="new-password" />
-                        <p class="description"><?php esc_html_e( 'Your key is encrypted in the database. Paste a new key to update it.', 'michelle-ai-plugin' ); ?></p>
+                        <p class="description"><?php esc_html_e( 'Your key is encrypted in the database. Paste a new key to update it. The key must have the "Conversational AI" permission scope.', 'michelle-ai-plugin' ); ?></p>
                     </td>
                 </tr>
             </table>

@@ -313,8 +313,8 @@ class Michelle_AI_Chat {
                     }
                     $payload = substr( $line, 6 );
                     if ( $payload === '[DONE]' ) {
-                        echo "data: [DONE]\n\n";
-                        flush();
+                        // Don't send [DONE] yet — we'll send it after quick
+                        // replies are generated so the client stays connected.
                         continue;
                     }
                     $json  = json_decode( $payload, true );
@@ -372,6 +372,10 @@ class Michelle_AI_Chat {
             // Run data extraction
             Michelle_AI::maybe_extract_data( $conv_id );
         }
+
+        // Send [DONE] last so the client stays connected for quick replies
+        echo "data: [DONE]\n\n";
+        flush();
 
         exit;
     }

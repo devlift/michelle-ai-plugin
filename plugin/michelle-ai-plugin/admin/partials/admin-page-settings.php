@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin: Settings page — 4 tabs.
+ * Admin: Settings page — 5 tabs.
  */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
@@ -20,6 +20,7 @@ $api_key_display = $s['openai_api_key'] ? '••••••••' : '';
         <a href="#branding" class="mai-tab mai-tab-active" data-tab="branding"><?php esc_html_e( 'Branding', 'michelle-ai-plugin' ); ?></a>
         <a href="#chat"     class="mai-tab" data-tab="chat"><?php esc_html_e( 'Chat', 'michelle-ai-plugin' ); ?></a>
         <a href="#ai"       class="mai-tab" data-tab="ai"><?php esc_html_e( 'AI', 'michelle-ai-plugin' ); ?></a>
+        <a href="#extraction" class="mai-tab" data-tab="extraction"><?php esc_html_e( 'Data Collection', 'michelle-ai-plugin' ); ?></a>
         <a href="#contact"  class="mai-tab" data-tab="contact"><?php esc_html_e( 'Contact Form', 'michelle-ai-plugin' ); ?></a>
     </div>
 
@@ -130,10 +131,18 @@ $api_key_display = $s['openai_api_key'] ? '••••••••' : '';
                     <th><label for="openai_model"><?php esc_html_e( 'Model', 'michelle-ai-plugin' ); ?></label></th>
                     <td>
                         <select id="openai_model" name="openai_model">
-                            <option value="gpt-4o"      <?php selected( $s['openai_model'], 'gpt-4o' ); ?>>gpt-4o</option>
-                            <option value="gpt-4o-mini" <?php selected( $s['openai_model'], 'gpt-4o-mini' ); ?>>gpt-4o-mini (recommended)</option>
-                            <option value="gpt-4-turbo" <?php selected( $s['openai_model'], 'gpt-4-turbo' ); ?>>gpt-4-turbo</option>
-                            <option value="gpt-3.5-turbo" <?php selected( $s['openai_model'], 'gpt-3.5-turbo' ); ?>>gpt-3.5-turbo</option>
+                            <optgroup label="GPT-5 Series">
+                                <option value="gpt-5.2"     <?php selected( $s['openai_model'], 'gpt-5.2' ); ?>>gpt-5.2</option>
+                                <option value="gpt-5.2-pro" <?php selected( $s['openai_model'], 'gpt-5.2-pro' ); ?>>gpt-5.2-pro</option>
+                                <option value="gpt-5"       <?php selected( $s['openai_model'], 'gpt-5' ); ?>>gpt-5</option>
+                                <option value="gpt-5-mini"  <?php selected( $s['openai_model'], 'gpt-5-mini' ); ?>>gpt-5-mini (recommended)</option>
+                                <option value="gpt-5-nano"  <?php selected( $s['openai_model'], 'gpt-5-nano' ); ?>>gpt-5-nano</option>
+                            </optgroup>
+                            <optgroup label="GPT-4 Series">
+                                <option value="gpt-4.1"     <?php selected( $s['openai_model'], 'gpt-4.1' ); ?>>gpt-4.1</option>
+                                <option value="gpt-4o"      <?php selected( $s['openai_model'], 'gpt-4o' ); ?>>gpt-4o</option>
+                                <option value="gpt-4o-mini" <?php selected( $s['openai_model'], 'gpt-4o-mini' ); ?>>gpt-4o-mini</option>
+                            </optgroup>
                         </select>
                     </td>
                 </tr>
@@ -160,6 +169,49 @@ $api_key_display = $s['openai_api_key'] ? '••••••••' : '';
                     </td>
                 </tr>
             </table>
+        </div>
+
+        <!-- ── Data Collection ────────────────────────────────────────────── -->
+        <div class="mai-tab-panel" id="mai-tab-extraction" hidden>
+            <table class="form-table">
+                <tr>
+                    <th><?php esc_html_e( 'Data Extraction', 'michelle-ai-plugin' ); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="extraction_enabled" value="1" <?php checked( $s['extraction_enabled'] ); ?> />
+                            <?php esc_html_e( 'Enable automatic data extraction from conversations', 'michelle-ai-plugin' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( 'When enabled, the AI will attempt to extract configured properties from conversation messages.', 'michelle-ai-plugin' ); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <h3><?php esc_html_e( 'Extraction Properties', 'michelle-ai-plugin' ); ?></h3>
+            <p class="description" style="margin-bottom:12px;">
+                <?php esc_html_e( 'Define the properties the AI should extract from conversations. Each property needs a unique key, a display label, and a prompt describing when and how to extract the value.', 'michelle-ai-plugin' ); ?>
+            </p>
+
+            <div id="mai-extraction-props">
+                <?php
+                $props = $s['extraction_properties'];
+                if ( ! is_array( $props ) ) { $props = []; }
+                if ( empty( $props ) ) {
+                    // Show two blank starter rows
+                    $props = [
+                        [ 'key' => 'first_name', 'label' => 'First Name', 'prompt' => 'Extract the visitor\'s first name if they mention it.' ],
+                        [ 'key' => 'last_name',  'label' => 'Last Name',  'prompt' => 'Extract the visitor\'s last name if they mention it.' ],
+                    ];
+                }
+                foreach ( $props as $i => $prop ) : ?>
+                    <div class="mai-prop-row" data-index="<?php echo (int) $i; ?>">
+                        <input type="text" class="mai-prop-key" placeholder="<?php esc_attr_e( 'key (e.g. city)', 'michelle-ai-plugin' ); ?>" value="<?php echo esc_attr( $prop['key'] ?? '' ); ?>" />
+                        <input type="text" class="mai-prop-label" placeholder="<?php esc_attr_e( 'Label (e.g. City)', 'michelle-ai-plugin' ); ?>" value="<?php echo esc_attr( $prop['label'] ?? '' ); ?>" />
+                        <input type="text" class="mai-prop-prompt" placeholder="<?php esc_attr_e( 'Extraction prompt...', 'michelle-ai-plugin' ); ?>" value="<?php echo esc_attr( $prop['prompt'] ?? '' ); ?>" />
+                        <button type="button" class="button mai-prop-remove" title="<?php esc_attr_e( 'Remove', 'michelle-ai-plugin' ); ?>">&times;</button>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <p><button type="button" class="button" id="mai-add-prop"><?php esc_html_e( '+ Add Property', 'michelle-ai-plugin' ); ?></button></p>
         </div>
 
         <!-- ── Contact Form ─────────────────────────────────────────────── -->

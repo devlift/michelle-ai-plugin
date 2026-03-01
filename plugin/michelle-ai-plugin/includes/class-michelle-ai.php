@@ -52,6 +52,7 @@ class Michelle_AI {
     // -------------------------------------------------------------------------
     private function define_cron_hooks() {
         $this->loader->add_action( 'michelle_ai_generate_response', $this, 'handle_ai_response_cron' );
+        $this->loader->add_action( 'michelle_ai_extract_data',      $this, 'handle_extraction_cron' );
     }
 
     /**
@@ -65,7 +66,16 @@ class Michelle_AI {
             return;
         }
 
-        $db_messages  = Michelle_AI_DB::get_messages( $conv_id );
+        $db_messages = Michelle_AI_DB::get_messages( $conv_id );
+
+        // Guard: skip if the SSE stream already saved an AI response after the last visitor message
+        if ( ! empty( $db_messages ) ) {
+            $last = end( $db_messages );
+            if ( $last->sender_type !== 'visitor' ) {
+                return;
+            }
+        }
+
         $api_messages = Michelle_AI_AI::build_messages_for_api( $db_messages );
         $response     = Michelle_AI_AI::generate_response( $api_messages, false );
 
@@ -73,13 +83,16 @@ class Michelle_AI {
             return;
         }
 
-        $mod_mode = Michelle_AI_Settings::get( 'moderation_mode', false );
-        $msg_id   = Michelle_AI_DB::add_message( $conv_id, 'ai', $response, [
-            'is_pending_mod' => $mod_mode ? 1 : 0,
+        // When auto_reply is on, skip moderation — the response goes straight to
+        // the visitor. Moderation only applies in admin-driven workflows.
+        $mod_mode    = Michelle_AI_Settings::get( 'moderation_mode', false );
+        $pending_mod = $mod_mode && ! $auto_reply;
+        $msg_id      = Michelle_AI_DB::add_message( $conv_id, 'ai', $response, [
+            'is_pending_mod' => $pending_mod ? 1 : 0,
         ] );
 
         // Generate quick replies for the response
-        if ( ! $mod_mode ) {
+        if ( ! $pending_mod ) {
             $all_msgs     = Michelle_AI_DB::get_messages( $conv_id );
             $api_msgs_for = Michelle_AI_AI::build_messages_for_api( $all_msgs );
             $quick        = Michelle_AI_AI::generate_quick_replies( $api_msgs_for );
@@ -91,6 +104,58 @@ class Michelle_AI {
                     [ 'id' => $msg_id ],
                     [ '%s' ], [ '%d' ]
                 );
+            }
+        }
+
+        // Run data extraction
+        self::maybe_extract_data( $conv_id );
+    }
+
+    /**
+     * Cron handler: run data extraction for a conversation.
+     */
+    public function handle_extraction_cron( $conv_id ) {
+        self::maybe_extract_data( $conv_id );
+    }
+
+    // -------------------------------------------------------------------------
+    // Data extraction
+    // -------------------------------------------------------------------------
+
+    /**
+     * Run data extraction on a conversation if extraction is enabled.
+     * Called after AI responses are saved. Updates visitor_name if
+     * first_name or last_name are extracted.
+     */
+    public static function maybe_extract_data( $conv_id ) {
+        $enabled    = Michelle_AI_Settings::get( 'extraction_enabled', false );
+        $properties = Michelle_AI_Settings::get( 'extraction_properties', [] );
+
+        if ( ! $enabled || ! is_array( $properties ) || empty( $properties ) ) {
+            return;
+        }
+
+        $db_messages  = Michelle_AI_DB::get_messages( $conv_id );
+        $api_messages = Michelle_AI_AI::build_messages_for_api( $db_messages );
+
+        $extracted = Michelle_AI_AI::extract_properties( $api_messages, $properties );
+
+        if ( empty( $extracted ) ) {
+            return;
+        }
+
+        // Save each extracted property
+        foreach ( $extracted as $key => $value ) {
+            Michelle_AI_DB::save_extracted_data( $conv_id, $key, $value );
+        }
+
+        // Update visitor_name if first_name or last_name were extracted
+        $first = Michelle_AI_DB::get_extracted_value( $conv_id, 'first_name' );
+        $last  = Michelle_AI_DB::get_extracted_value( $conv_id, 'last_name' );
+        if ( $first || $last ) {
+            $name = trim( ( $first ?: '' ) . ' ' . ( $last ?: '' ) );
+            if ( $name ) {
+                Michelle_AI_DB::update_conversation( $conv_id, [ 'visitor_name' => $name ] );
             }
         }
     }

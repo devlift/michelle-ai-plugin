@@ -23,6 +23,9 @@
         pollTimer:      null,
         streaming:      false,
         notifGranted:   false,
+        hasOlder:       false,
+        loadingOlder:   false,
+        oldestMsgId:    null,
     };
 
     // Persist session across page loads
@@ -62,6 +65,27 @@
         messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
+    function getAgentInitial() {
+        return (cfg.agentName || 'S').charAt(0).toUpperCase();
+    }
+
+    function createAvatarEl(senderType) {
+        const avatar = document.createElement('div');
+        avatar.className = 'mai-msg-avatar';
+        if (senderType === 'visitor') {
+            // Person silhouette icon
+            avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z" fill="currentColor"/></svg>';
+        } else if (cfg.logoUrl) {
+            const img = document.createElement('img');
+            img.src = cfg.logoUrl;
+            img.alt = cfg.agentName || 'Agent';
+            avatar.appendChild(img);
+        } else {
+            avatar.textContent = getAgentInitial();
+        }
+        return avatar;
+    }
+
     // -------------------------------------------------------------------------
     // Notification permission
     // -------------------------------------------------------------------------
@@ -95,16 +119,14 @@
         chatWindow.hidden = false;
         chatWindow.classList.remove('mai-closing');
         chatWindow.classList.add('mai-opening');
-        fab.querySelector('.mai-fab-open').hidden = true;
-        fab.querySelector('.mai-fab-close').hidden = false;
+        fab.classList.add('mai-fab-active');
         clearUnread();
 
         if (!state.conversationId) {
             startConversation();
         } else {
-            // Resume: load history
-            fetchMessages(null, true);
-            startPolling();
+            // Resume existing session — load full history immediately
+            resumeSession();
         }
         requestNotifPermission();
     }
@@ -117,9 +139,45 @@
         chatWindow.addEventListener('animationend', () => {
             chatWindow.hidden = true;
         }, { once: true });
-        fab.querySelector('.mai-fab-open').hidden = false;
-        fab.querySelector('.mai-fab-close').hidden = true;
+        fab.classList.remove('mai-fab-active');
         stopPolling();
+    }
+
+    /**
+     * Resume an existing session: validate the token by loading latest messages.
+     * If the token is expired (403), start a fresh conversation instead.
+     */
+    async function resumeSession() {
+        try {
+            // Load latest 30 messages (paginated)
+            const url = `${API}/conversations/${state.conversationId}/messages?token=${encodeURIComponent(state.token)}&limit=30`;
+            const resp = await apiFetch(url, 'GET');
+            // Support both old format (array) and new (paginated object)
+            const msgs = Array.isArray(resp) ? resp : (resp.messages || []);
+            if (msgs && msgs.length) {
+                const existingIds = new Set(
+                    Array.from(messagesEl.querySelectorAll('.mai-message[data-id]')).map(el => parseInt(el.dataset.id, 10))
+                );
+                msgs.forEach(msg => {
+                    if (!existingIds.has(msg.id)) {
+                        appendMessage(msg);
+                    }
+                });
+                state.lastPollTime = msgs[msgs.length - 1].created_at;
+                state.oldestMsgId  = msgs[0].id;
+            }
+            scrollToBottom();
+            startPolling();
+            initInfiniteScroll();
+        } catch (e) {
+            // Token expired or conversation gone — start fresh
+            state.conversationId = null;
+            state.token = null;
+            state.lastPollTime = null;
+            saveSession();
+            messagesEl.innerHTML = '';
+            startConversation();
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -147,22 +205,32 @@
         wrap.className = `mai-message mai-from-${msg.sender_type}`;
         wrap.dataset.id = msg.id;
 
+        // Avatar
+        const avatar = createAvatarEl(msg.sender_type);
+
+        // Content wrapper
+        const content = document.createElement('div');
+        content.className = 'mai-msg-content';
+
         const bubble = document.createElement('div');
         bubble.className = 'mai-bubble';
         bubble.textContent = msg.content;
 
         const meta = document.createElement('div');
         meta.className = 'mai-msg-meta';
-        meta.textContent = (msg.sender_type === 'visitor' ? 'You' : (cfg.agentName || 'Support')) + ' · ' + formatTime(msg.created_at);
+        meta.textContent = (msg.sender_type === 'visitor' ? 'You' : (cfg.agentName || 'Support')) + ' \u00B7 ' + formatTime(msg.created_at);
 
-        wrap.appendChild(bubble);
-        wrap.appendChild(meta);
+        content.appendChild(bubble);
+        content.appendChild(meta);
 
         // Quick reply chips
         if (msg.quick_replies && msg.quick_replies.length && msg.sender_type !== 'visitor') {
             const qrEl = renderQuickReplies(msg.quick_replies);
-            wrap.appendChild(qrEl);
+            content.appendChild(qrEl);
         }
+
+        wrap.appendChild(avatar);
+        wrap.appendChild(content);
 
         messagesEl.appendChild(wrap);
         scrollToBottom();
@@ -170,7 +238,7 @@
 
     function appendSystemMsg(text) {
         const el = document.createElement('div');
-        el.style.cssText = 'text-align:center;font-size:12px;color:var(--mai-muted);padding:4px 0;';
+        el.style.cssText = 'text-align:center;font-size:12px;color:var(--mai-muted);padding:6px 0;';
         el.textContent = text;
         messagesEl.appendChild(el);
         scrollToBottom();
@@ -198,11 +266,20 @@
         wrap.className = 'mai-message mai-from-ai';
         wrap.id = 'mai-streaming-bubble';
 
+        // Avatar
+        const avatar = createAvatarEl('ai');
+
+        // Content wrapper
+        const content = document.createElement('div');
+        content.className = 'mai-msg-content';
+
         const bubble = document.createElement('div');
         bubble.className = 'mai-bubble';
         bubble.textContent = '';
 
-        wrap.appendChild(bubble);
+        content.appendChild(bubble);
+        wrap.appendChild(avatar);
+        wrap.appendChild(content);
         messagesEl.appendChild(wrap);
         scrollToBottom();
         return bubble;
@@ -214,6 +291,10 @@
     async function sendMessage(text) {
         if (!text || state.streaming) return;
         if (!state.conversationId) return;
+
+        // Stop polling BEFORE posting to prevent race condition where a poll
+        // picks up the server-side message before we can track its ID.
+        stopPolling();
 
         // Render visitor bubble immediately
         appendMessage({
@@ -233,15 +314,20 @@
         } catch(e) {
             appendSystemMsg('Failed to send message.');
             sendBtn.disabled = false;
+            startPolling();
             return;
         }
 
-        // Show typing indicator
-        typingEl.hidden = false;
-        scrollToBottom();
-
-        // Open SSE stream for AI response
-        openStream();
+        // Only show typing and open SSE stream if AI auto-reply is enabled
+        if (cfg.autoReply !== false) {
+            typingEl.hidden = false;
+            scrollToBottom();
+            openStream();
+        } else {
+            sendBtn.disabled = false;
+            state.lastPollTime = new Date().toISOString();
+            startPolling();
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -270,10 +356,13 @@
                     const wrap = document.getElementById('mai-streaming-bubble');
                     if (wrap) {
                         wrap.removeAttribute('id');
-                        const meta = document.createElement('div');
-                        meta.className = 'mai-msg-meta';
-                        meta.textContent = (cfg.agentName || 'Support') + ' · ' + formatTime(null);
-                        wrap.appendChild(meta);
+                        const content = wrap.querySelector('.mai-msg-content');
+                        if (content) {
+                            const meta = document.createElement('div');
+                            meta.className = 'mai-msg-meta';
+                            meta.textContent = (cfg.agentName || 'Support') + ' \u00B7 ' + formatTime(null);
+                            content.appendChild(meta);
+                        }
                     }
                 }
 
@@ -296,10 +385,12 @@
             }
 
             if (data.quick_replies && data.quick_replies.length) {
-                const wrap = document.getElementById('mai-streaming-bubble') || bubble?.closest('.mai-message');
+                const wrap = document.getElementById('mai-streaming-bubble');
                 if (wrap) {
-                    const existing = wrap.querySelector('.mai-quick-replies');
-                    if (!existing) wrap.appendChild(renderQuickReplies(data.quick_replies));
+                    const content = wrap.querySelector('.mai-msg-content');
+                    if (content && !content.querySelector('.mai-quick-replies')) {
+                        content.appendChild(renderQuickReplies(data.quick_replies));
+                    }
                 }
             }
         };
@@ -332,26 +423,49 @@
         try {
             const since = (all || !state.lastPollTime) ? '' : state.lastPollTime;
             const url   = `${API}/conversations/${state.conversationId}/messages?token=${encodeURIComponent(state.token)}${since ? '&since=' + encodeURIComponent(since) : ''}`;
-            const msgs  = await apiFetch(url, 'GET');
+            const resp  = await apiFetch(url, 'GET');
+            // Support both array (polling/since) and paginated object
+            const msgs  = Array.isArray(resp) ? resp : (resp.messages || resp || []);
             if (!msgs || !msgs.length) return;
 
             const existingIds = new Set(
                 Array.from(messagesEl.querySelectorAll('.mai-message[data-id]')).map(el => parseInt(el.dataset.id, 10))
             );
 
+            // Also collect content of optimistically rendered visitor messages
+            // (those with large Date.now()-style IDs) for content-based dedup.
+            const optimisticTexts = new Set();
+            messagesEl.querySelectorAll('.mai-from-visitor[data-id]').forEach(el => {
+                const id = parseInt(el.dataset.id, 10);
+                if (id > 1000000) {
+                    const bubble = el.querySelector('.mai-bubble');
+                    if (bubble) optimisticTexts.add(bubble.textContent);
+                }
+            });
+
             msgs.forEach(msg => {
-                if (!existingIds.has(msg.id)) {
-                    appendMessage(msg);
-                    if (msg.sender_type !== 'visitor') {
-                        // Show unread dot if widget is closed
-                        if (!state.open) showUnread();
-                        fireNotification(msg.content);
-                    }
+                if (existingIds.has(msg.id)) return;
+                // Skip visitor messages that match an optimistic render
+                if (msg.sender_type === 'visitor' && optimisticTexts.has(msg.content)) {
+                    // Replace the optimistic ID with the real server ID
+                    const optEl = Array.from(messagesEl.querySelectorAll('.mai-from-visitor[data-id]'))
+                        .find(el => parseInt(el.dataset.id, 10) > 1000000 && el.querySelector('.mai-bubble')?.textContent === msg.content);
+                    if (optEl) optEl.dataset.id = msg.id;
+                    optimisticTexts.delete(msg.content);
+                    return;
+                }
+                appendMessage(msg);
+                if (msg.sender_type !== 'visitor') {
+                    if (!state.open) showUnread();
+                    fireNotification(msg.content);
                 }
             });
 
             if (msgs.length) {
                 state.lastPollTime = msgs[msgs.length - 1].created_at;
+                if (!state.oldestMsgId || msgs[0].id < state.oldestMsgId) {
+                    state.oldestMsgId = msgs[0].id;
+                }
             }
         } catch(e) {
             // silent fail on poll errors
@@ -387,7 +501,7 @@
 
             errEl.hidden = true;
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Sending…';
+            submitBtn.textContent = 'Sending\u2026';
 
             const data = {
                 name:    form.querySelector('[name=name]').value.trim(),
@@ -433,11 +547,89 @@
     }
 
     // -------------------------------------------------------------------------
+    // Infinite scroll (load older messages)
+    // -------------------------------------------------------------------------
+    function initInfiniteScroll() {
+        if (!messagesEl) return;
+        messagesEl.addEventListener('scroll', () => {
+            if (messagesEl.scrollTop < 60 && !state.loadingOlder && state.oldestMsgId) {
+                loadOlderMessages();
+            }
+        });
+    }
+
+    async function loadOlderMessages() {
+        if (state.loadingOlder || !state.conversationId || !state.oldestMsgId) return;
+        state.loadingOlder = true;
+
+        try {
+            const url = `${API}/conversations/${state.conversationId}/messages?token=${encodeURIComponent(state.token)}&before=${state.oldestMsgId}&limit=20`;
+            const resp = await apiFetch(url, 'GET');
+            const msgs = resp.messages || [];
+
+            if (!msgs.length || !resp.has_older) {
+                state.oldestMsgId = null; // no more older messages
+            }
+
+            if (msgs.length) {
+                const prevHeight = messagesEl.scrollHeight;
+                const prevTop    = messagesEl.scrollTop;
+
+                // Prepend messages in order (msgs are already chronological)
+                const firstChild = messagesEl.firstChild;
+                msgs.forEach(msg => {
+                    const wrap = buildMessageEl(msg);
+                    messagesEl.insertBefore(wrap, firstChild);
+                });
+
+                state.oldestMsgId = msgs[0].id;
+
+                // Restore scroll so user doesn't jump
+                const newHeight = messagesEl.scrollHeight;
+                messagesEl.scrollTop = prevTop + (newHeight - prevHeight);
+            }
+        } catch (e) {
+            // silent
+        }
+        state.loadingOlder = false;
+    }
+
+    /** Build a message DOM element (used for prepending older messages) */
+    function buildMessageEl(msg) {
+        const wrap = document.createElement('div');
+        wrap.className = `mai-message mai-from-${msg.sender_type}`;
+        wrap.dataset.id = msg.id;
+
+        const avatar = createAvatarEl(msg.sender_type);
+        const content = document.createElement('div');
+        content.className = 'mai-msg-content';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'mai-bubble';
+        bubble.textContent = msg.content;
+
+        const meta = document.createElement('div');
+        meta.className = 'mai-msg-meta';
+        meta.textContent = (msg.sender_type === 'visitor' ? 'You' : (cfg.agentName || 'Support')) + ' \u00B7 ' + formatTime(msg.created_at);
+
+        content.appendChild(bubble);
+        content.appendChild(meta);
+
+        if (msg.quick_replies && msg.quick_replies.length && msg.sender_type !== 'visitor') {
+            content.appendChild(renderQuickReplies(msg.quick_replies));
+        }
+
+        wrap.appendChild(avatar);
+        wrap.appendChild(content);
+        return wrap;
+    }
+
+    // -------------------------------------------------------------------------
     // Auto-grow textarea
     // -------------------------------------------------------------------------
     function autoGrow(el) {
         el.style.height = 'auto';
-        el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+        el.style.height = Math.min(el.scrollHeight, 80) + 'px';
     }
 
     // -------------------------------------------------------------------------

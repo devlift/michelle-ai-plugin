@@ -33,10 +33,14 @@ class Michelle_AI_Settings {
 
             // AI
             'openai_api_key'   => '',
-            'openai_model'     => 'gpt-4o-mini',
+            'openai_model'     => 'gpt-5-mini',
             'system_prompt'    => 'You are a helpful and friendly customer support assistant. Be concise and professional.',
             'context_messages' => 10,
             'temperature'      => 0.7,
+
+            // Data extraction
+            'extraction_enabled'    => false,
+            'extraction_properties' => [],
 
             // Contact form
             'form_title'          => 'Send us a message',
@@ -72,9 +76,10 @@ class Michelle_AI_Settings {
     public static function save( array $data ) {
         $current = self::all();
         $updated = array_merge( $current, $data );
-        // Never store the raw API key — encrypt it
-        if ( isset( $updated['openai_api_key'] ) && $updated['openai_api_key'] !== '' ) {
-            $updated['openai_api_key'] = self::encrypt( $updated['openai_api_key'] );
+        // Only encrypt the API key when it is actually being changed (present in $data).
+        // Otherwise the already-encrypted value from the DB would get re-encrypted.
+        if ( array_key_exists( 'openai_api_key', $data ) && $data['openai_api_key'] !== '' ) {
+            $updated['openai_api_key'] = self::encrypt( $data['openai_api_key'] );
         }
         update_option( self::OPTION_KEY, $updated );
     }

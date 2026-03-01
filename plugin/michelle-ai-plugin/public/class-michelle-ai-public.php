@@ -32,6 +32,7 @@ class Michelle_AI_Public {
         wp_localize_script( 'michelle-ai-public', 'michelleAICfg', [
             'restUrl'     => esc_url_raw( rest_url( 'michelle-ai/v1' ) ),
             'chatEnabled' => $chat_enabled,
+            'autoReply'   => (bool) Michelle_AI_Settings::get( 'auto_reply', true ),
             'widgetTitle' => Michelle_AI_Settings::get( 'widget_title', 'Chat with us' ),
             'agentName'   => Michelle_AI_Settings::get( 'agent_name', 'Support' ),
             'logoUrl'     => Michelle_AI_Settings::get( 'logo_url', '' ),

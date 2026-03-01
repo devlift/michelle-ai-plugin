@@ -69,13 +69,16 @@
                 data[key] = val;
             });
             // Explicitly handle unchecked checkboxes
-            ['chat_enabled','auto_reply','moderation_mode','notification_sound'].forEach(k => {
+            ['chat_enabled','auto_reply','moderation_mode','notification_sound','extraction_enabled'].forEach(k => {
                 if (!(k in data)) data[k] = false;
                 else data[k] = true;
             });
             // Numeric fields
             if (data.context_messages) data.context_messages = parseInt(data.context_messages, 10);
             if (data.temperature)      data.temperature      = parseFloat(data.temperature);
+
+            // Collect extraction properties from dynamic rows
+            data.extraction_properties = collectExtractionProps();
 
             try {
                 await apiPost('/admin/settings', data);
@@ -88,6 +91,120 @@
             btn.disabled = false;
             btn.textContent = 'Save Settings';
         });
+    }
+
+    // -------------------------------------------------------------------------
+    // Autoscroll + infinite scroll for conversation messages
+    // -------------------------------------------------------------------------
+    function initMessageScroll() {
+        const thread = document.getElementById('mai-detail-messages');
+        if (!thread) return;
+
+        // Scroll to bottom after browser finishes layout
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                thread.scrollTop = thread.scrollHeight;
+            });
+        });
+
+        // "Load older" button
+        const loadBtn = document.getElementById('mai-load-older-btn');
+        if (!loadBtn) return;
+
+        const convId = parseInt(thread.dataset.convId, 10);
+        let loading = false;
+
+        async function loadOlder() {
+            if (loading) return;
+            loading = true;
+            loadBtn.textContent = 'Loading…';
+
+            // Find the oldest message ID currently in the thread
+            const firstBubble = thread.querySelector('.mai-admin-bubble[data-msg-id]');
+            if (!firstBubble) { loading = false; return; }
+            const beforeId = parseInt(firstBubble.dataset.msgId, 10);
+
+            try {
+                const res = await apiGet(`/admin/conversations/${convId}/messages?before=${beforeId}&limit=30`);
+                const msgs = res.messages || [];
+                if (!msgs.length || !res.has_older) {
+                    // No more older messages
+                    document.getElementById('mai-load-older')?.remove();
+                }
+                if (msgs.length) {
+                    // Remember scroll position so we can keep the view stable
+                    const prevHeight = thread.scrollHeight;
+                    const prevTop    = thread.scrollTop;
+
+                    // Insert messages before the first existing bubble
+                    const anchor = document.getElementById('mai-load-older');
+                    const visitorName = thread.dataset.visitorName || 'Anonymous';
+                    msgs.forEach(msg => {
+                        const el = buildAdminBubbleEl(msg, visitorName);
+                        if (anchor && anchor.nextSibling) {
+                            thread.insertBefore(el, anchor.nextSibling);
+                        } else {
+                            thread.insertBefore(el, firstBubble);
+                        }
+                    });
+
+                    // Restore scroll position so user doesn't jump
+                    const newHeight = thread.scrollHeight;
+                    thread.scrollTop = prevTop + (newHeight - prevHeight);
+                }
+                if (msgs.length && res.has_older) {
+                    loadBtn.textContent = 'Load older messages…';
+                }
+            } catch (e) {
+                loadBtn.textContent = 'Load older messages…';
+            }
+            loading = false;
+        }
+
+        loadBtn.addEventListener('click', loadOlder);
+
+        // Also trigger on scroll to top (infinite scroll)
+        thread.addEventListener('scroll', () => {
+            if (thread.scrollTop < 80 && !loading && document.getElementById('mai-load-older')) {
+                loadOlder();
+            }
+        });
+    }
+
+    function buildAdminBubbleEl(msg, visitorName) {
+        const isPending = msg.is_pending_mod;
+        let cls = 'mai-admin-bubble mai-bubble-' + msg.sender_type;
+        if (isPending) cls += ' mai-bubble-pending';
+
+        const el = document.createElement('div');
+        el.className = cls;
+        el.dataset.msgId = msg.id;
+
+        let senderLabel;
+        if (msg.sender_type === 'visitor') senderLabel = escHtml(visitorName);
+        else if (msg.sender_type === 'ai') senderLabel = 'AI';
+        else senderLabel = 'Admin';
+
+        const time = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+        let html = `<div class="mai-bubble-sender">${senderLabel} <span class="mai-bubble-time">${escHtml(time)}</span>`;
+        if (isPending) html += ` <span class="mai-pending-label">Pending approval</span>`;
+        html += `</div><div class="mai-bubble-text">${escHtml(msg.content)}</div>`;
+
+        if (isPending) {
+            html += `<button class="button mai-approve-btn" data-msg-id="${msg.id}">✓ Approve &amp; Send</button>`;
+        }
+
+        if (msg.quick_replies && msg.quick_replies.length) {
+            html += `<div class="mai-admin-qr-list"><span>Quick replies offered to visitor:</span>`;
+            msg.quick_replies.forEach(qr => {
+                html += `<span class="mai-admin-qr-chip">${escHtml(qr)}</span>`;
+            });
+            html += `</div>`;
+        }
+
+        el.innerHTML = html;
+        return el;
     }
 
     // -------------------------------------------------------------------------
@@ -329,12 +446,56 @@
     }
 
     // -------------------------------------------------------------------------
+    // Extraction properties (dynamic rows)
+    // -------------------------------------------------------------------------
+    function collectExtractionProps() {
+        const rows = document.querySelectorAll('.mai-prop-row');
+        const props = [];
+        rows.forEach(row => {
+            const key    = row.querySelector('.mai-prop-key')?.value.trim();
+            const label  = row.querySelector('.mai-prop-label')?.value.trim();
+            const prompt = row.querySelector('.mai-prop-prompt')?.value.trim();
+            if (key && label) {
+                props.push({ key, label, prompt: prompt || '' });
+            }
+        });
+        return props;
+    }
+
+    function initExtractionProps() {
+        const container = document.getElementById('mai-extraction-props');
+        const addBtn    = document.getElementById('mai-add-prop');
+        if (!container || !addBtn) return;
+
+        addBtn.addEventListener('click', () => {
+            const idx = container.querySelectorAll('.mai-prop-row').length;
+            const row = document.createElement('div');
+            row.className = 'mai-prop-row';
+            row.dataset.index = idx;
+            row.innerHTML =
+                '<input type="text" class="mai-prop-key" placeholder="key (e.g. city)" />' +
+                '<input type="text" class="mai-prop-label" placeholder="Label (e.g. City)" />' +
+                '<input type="text" class="mai-prop-prompt" placeholder="Extraction prompt..." />' +
+                '<button type="button" class="button mai-prop-remove" title="Remove">&times;</button>';
+            container.appendChild(row);
+        });
+
+        container.addEventListener('click', (e) => {
+            if (e.target.matches('.mai-prop-remove')) {
+                e.target.closest('.mai-prop-row').remove();
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
     // Boot
     // -------------------------------------------------------------------------
     document.addEventListener('DOMContentLoaded', () => {
         initTabs();
         initTemperature();
         initSettingsForm();
+        initExtractionProps();
+        initMessageScroll();
         initReply();
         initSuggestedReply();
         initApprove();

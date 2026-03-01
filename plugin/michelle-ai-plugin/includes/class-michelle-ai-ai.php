@@ -132,6 +132,76 @@ class Michelle_AI_AI {
         return array_slice( $result, -$context_limit );
     }
 
+    /**
+     * Extract structured data from conversation messages based on configured properties.
+     *
+     * @param array $messages   OpenAI-style messages array.
+     * @param array $properties Array of [ 'key' => ..., 'label' => ..., 'prompt' => ... ].
+     * @return array            Associative array of extracted key => value pairs.
+     */
+    public static function extract_properties( array $messages, array $properties ) {
+        $api_key = Michelle_AI_Settings::get_api_key();
+        if ( ! $api_key || empty( $properties ) || empty( $messages ) ) {
+            return [];
+        }
+
+        // Build the property descriptions for the prompt
+        $prop_lines = [];
+        foreach ( $properties as $prop ) {
+            $prop_lines[] = sprintf( '- "%s" (%s): %s', $prop['key'], $prop['label'], $prop['prompt'] );
+        }
+        $prop_list = implode( "\n", $prop_lines );
+
+        // Only send the last few messages to keep the extraction focused
+        $recent = array_slice( $messages, -10 );
+        $conversation_text = '';
+        foreach ( $recent as $m ) {
+            $role = $m['role'] === 'user' ? 'Visitor' : 'Assistant';
+            $conversation_text .= "$role: {$m['content']}\n";
+        }
+
+        $system = "You are a data extraction assistant. Analyze the conversation below and extract any of the following properties if they are mentioned or can be inferred. Return ONLY a JSON object with the property keys as keys and extracted values as string values. Only include properties where a value was clearly stated or strongly implied. If nothing can be extracted, return an empty JSON object {}. Do not include null values or guesses.\n\nProperties to extract:\n{$prop_list}";
+
+        $payload_messages = [
+            [ 'role' => 'system', 'content' => $system ],
+            [ 'role' => 'user',   'content' => $conversation_text ],
+        ];
+
+        $model = Michelle_AI_Settings::get( 'openai_model', 'gpt-4o-mini' );
+
+        $body = [
+            'model'       => $model,
+            'messages'    => $payload_messages,
+            'temperature' => 0.1,
+            'stream'      => false,
+        ];
+
+        $response = self::blocking_request( $api_key, $body );
+        if ( ! $response ) {
+            return [];
+        }
+
+        // Strip possible markdown code fences
+        $response = preg_replace( '/^```json?\s*/i', '', trim( $response ) );
+        $response = preg_replace( '/```$/', '', $response );
+
+        $decoded = json_decode( trim( $response ), true );
+        if ( ! is_array( $decoded ) ) {
+            return [];
+        }
+
+        // Filter to only configured property keys with non-empty string values
+        $valid_keys = array_column( $properties, 'key' );
+        $result     = [];
+        foreach ( $decoded as $k => $v ) {
+            if ( in_array( $k, $valid_keys, true ) && is_string( $v ) && $v !== '' ) {
+                $result[ $k ] = $v;
+            }
+        }
+
+        return $result;
+    }
+
     // -------------------------------------------------------------------------
     // SSE streaming output
     // -------------------------------------------------------------------------
@@ -210,7 +280,13 @@ class Michelle_AI_AI {
             return null;
         }
 
-        $data = json_decode( wp_remote_retrieve_body( $response ), true );
+        $resp_body = wp_remote_retrieve_body( $response );
+        $http_code = wp_remote_retrieve_response_code( $response );
+        if ( $http_code >= 400 ) {
+            error_log( 'Michelle AI: OpenAI HTTP ' . $http_code . ' — ' . substr( $resp_body, 0, 500 ) );
+        }
+
+        $data = json_decode( $resp_body, true );
         return $data['choices'][0]['message']['content'] ?? null;
     }
 }

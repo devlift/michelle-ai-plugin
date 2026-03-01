@@ -25,17 +25,14 @@ $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
 
     <!-- FAB toggle button -->
     <button id="mai-fab" aria-label="Open chat" title="<?php echo $title; ?>">
-        <span class="mai-fab-icon mai-fab-open">
-            <!-- Chat bubble SVG -->
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="currentColor"/>
-            </svg>
-        </span>
-        <span class="mai-fab-icon mai-fab-close" hidden>
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="currentColor"/>
-            </svg>
-        </span>
+        <!-- Chat bubble icon (visible when closed) -->
+        <svg class="mai-fab-icon mai-icon-chat" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <!-- Close X icon (visible when open) -->
+        <svg class="mai-fab-icon mai-icon-close" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
         <span class="mai-unread-dot" hidden aria-label="New messages"></span>
     </button>
 
@@ -50,13 +47,19 @@ $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
                 <?php else : ?>
                     <span class="mai-avatar mai-avatar-default"><?php echo mb_substr( $agent, 0, 1 ); ?></span>
                 <?php endif; ?>
-                <div>
+                <div class="mai-header-info">
                     <strong><?php echo $title; ?></strong>
-                    <span class="mai-status-dot"></span>
+                    <span class="mai-header-status">
+                        <span class="mai-status-dot"></span>
+                        Online
+                    </span>
                 </div>
             </div>
             <button class="mai-close-btn" aria-label="Close chat" id="mai-close-btn">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="currentColor"/></svg>
+                <!-- Chevron down icon -->
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
             </button>
         </div>
 
@@ -67,24 +70,36 @@ $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
 
         <!-- Typing indicator -->
         <div id="mai-typing" class="mai-typing" hidden>
-            <div class="mai-typing-bubble">
-                <span></span><span></span><span></span>
+            <div class="mai-typing-row">
+                <?php if ( $logo_url ) : ?>
+                    <div class="mai-typing-avatar"><img src="<?php echo $logo_url; ?>" alt="" /></div>
+                <?php else : ?>
+                    <div class="mai-typing-avatar"><?php echo mb_substr( $agent, 0, 1 ); ?></div>
+                <?php endif; ?>
+                <div class="mai-typing-bubble">
+                    <span></span><span></span><span></span>
+                </div>
             </div>
         </div>
 
         <!-- Input area -->
         <div class="mai-input-area">
-            <textarea
-                id="mai-input"
-                class="mai-input"
-                placeholder="Type a message…"
-                rows="1"
-                aria-label="Message input"
-                maxlength="2000"
-            ></textarea>
-            <button id="mai-send-btn" class="mai-send-btn" aria-label="Send message">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="currentColor"/></svg>
-            </button>
+            <div class="mai-input-wrapper">
+                <textarea
+                    id="mai-input"
+                    class="mai-input"
+                    placeholder="Ask anything..."
+                    rows="1"
+                    aria-label="Message input"
+                    maxlength="2000"
+                ></textarea>
+                <button id="mai-send-btn" class="mai-send-btn" aria-label="Send message">
+                    <!-- Arrow up icon -->
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <p class="mai-powered-by">Powered by Michelle AI</p>

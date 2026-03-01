@@ -53,6 +53,18 @@ class Michelle_AI_Activator {
             KEY created_at (created_at)
         ) $c;" );
 
+        // Extracted data from conversations
+        dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}michelle_ai_extracted_data (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            conversation_id BIGINT UNSIGNED NOT NULL,
+            property_key    VARCHAR(100) NOT NULL,
+            property_value  TEXT         NOT NULL,
+            extracted_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY conv_prop (conversation_id, property_key),
+            KEY conversation_id (conversation_id)
+        ) $c;" );
+
         // Contact form submissions
         dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}michelle_ai_contacts (
             id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

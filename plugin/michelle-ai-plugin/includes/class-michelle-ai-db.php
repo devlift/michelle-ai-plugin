@@ -23,6 +23,11 @@ class Michelle_AI_DB {
         return $wpdb->prefix . 'michelle_ai_messages';
     }
 
+    public static function extracted_data_table() {
+        global $wpdb;
+        return $wpdb->prefix . 'michelle_ai_extracted_data';
+    }
+
     public static function contacts_table() {
         global $wpdb;
         return $wpdb->prefix . 'michelle_ai_contacts';
@@ -196,6 +201,42 @@ class Michelle_AI_DB {
     }
 
     /**
+     * Get the total number of messages in a conversation.
+     */
+    public static function count_messages( $conversation_id ) {
+        global $wpdb;
+        return (int) $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COUNT(*) FROM ' . self::messages_table() . ' WHERE conversation_id = %d',
+                $conversation_id
+            )
+        );
+    }
+
+    /**
+     * Get paginated messages: newest $limit messages, or messages older than $before_id.
+     * Returns rows in chronological (ASC) order.
+     */
+    public static function get_messages_page( $conversation_id, $limit = 30, $before_id = null ) {
+        global $wpdb;
+        $before_clause = '';
+        if ( $before_id ) {
+            $before_clause = $wpdb->prepare( ' AND id < %d', $before_id );
+        }
+        // Get the newest $limit rows (ORDER DESC to pick from the end, then re-sort ASC)
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                'SELECT * FROM ' . self::messages_table() .
+                ' WHERE conversation_id = %d' . $before_clause .
+                ' ORDER BY id DESC LIMIT %d',
+                $conversation_id,
+                $limit
+            )
+        );
+        return array_reverse( $rows ); // chronological order
+    }
+
+    /**
      * Get a single message by ID.
      */
     public static function get_message( $id ) {
@@ -230,6 +271,56 @@ class Michelle_AI_DB {
             [ 'id'            => $message_id ],
             [ '%s' ],
             [ '%d' ]
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Extracted data
+    // -------------------------------------------------------------------------
+
+    /**
+     * Save or update an extracted property for a conversation.
+     */
+    public static function save_extracted_data( $conversation_id, $key, $value ) {
+        global $wpdb;
+        $wpdb->replace(
+            self::extracted_data_table(),
+            [
+                'conversation_id' => (int) $conversation_id,
+                'property_key'    => sanitize_key( $key ),
+                'property_value'  => sanitize_text_field( $value ),
+                'extracted_at'    => current_time( 'mysql' ),
+            ],
+            [ '%d', '%s', '%s', '%s' ]
+        );
+    }
+
+    /**
+     * Get all extracted data for a conversation.
+     */
+    public static function get_extracted_data( $conversation_id ) {
+        global $wpdb;
+        return $wpdb->get_results(
+            $wpdb->prepare(
+                'SELECT property_key, property_value, extracted_at FROM ' . self::extracted_data_table() .
+                ' WHERE conversation_id = %d ORDER BY extracted_at ASC',
+                $conversation_id
+            )
+        );
+    }
+
+    /**
+     * Get a single extracted property value.
+     */
+    public static function get_extracted_value( $conversation_id, $key ) {
+        global $wpdb;
+        return $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT property_value FROM ' . self::extracted_data_table() .
+                ' WHERE conversation_id = %d AND property_key = %s',
+                $conversation_id,
+                $key
+            )
         );
     }
 

@@ -76,9 +76,16 @@ class Michelle_AI_Chat {
         ] );
 
         register_rest_route( self::NS, '/admin/conversations/(?P<id>\d+)/messages', [
-            'methods'             => 'POST',
-            'callback'            => [ $this, 'admin_send_message' ],
-            'permission_callback' => [ $this, 'require_admin' ],
+            [
+                'methods'             => 'GET',
+                'callback'            => [ $this, 'admin_get_messages' ],
+                'permission_callback' => [ $this, 'require_admin' ],
+            ],
+            [
+                'methods'             => 'POST',
+                'callback'            => [ $this, 'admin_send_message' ],
+                'permission_callback' => [ $this, 'require_admin' ],
+            ],
         ] );
 
         register_rest_route( self::NS, '/admin/conversations/(?P<id>\d+)/suggest', [
@@ -177,8 +184,20 @@ class Michelle_AI_Chat {
     }
 
     public function get_messages( $request ) {
-        $conv_id = (int) $request->get_param( 'id' );
-        $since   = sanitize_text_field( $request->get_param( 'since' ) ?? '' );
+        $conv_id   = (int) $request->get_param( 'id' );
+        $since     = sanitize_text_field( $request->get_param( 'since' ) ?? '' );
+        $before_id = $request->get_param( 'before' ) ? (int) $request->get_param( 'before' ) : null;
+        $limit     = $request->get_param( 'limit' ) ? (int) $request->get_param( 'limit' ) : null;
+
+        if ( $before_id ) {
+            // Paginated "load older" request
+            $rows    = Michelle_AI_DB::get_messages_page( $conv_id, $limit ?: 30, $before_id );
+            $visible = array_filter( $rows, fn( $r ) => ! $r->is_pending_mod );
+            return rest_ensure_response( [
+                'messages'  => array_values( array_map( [ Michelle_AI_DB::class, 'format_message' ], $visible ) ),
+                'has_older' => count( $rows ) >= ( $limit ?: 30 ),
+            ] );
+        }
 
         $rows = Michelle_AI_DB::get_messages( $conv_id, $since ?: null );
 
@@ -203,15 +222,18 @@ class Michelle_AI_Chat {
         // Save visitor message
         Michelle_AI_DB::add_message( $conv_id, 'visitor', $content );
 
-        // Trigger AI pipeline asynchronously via action scheduler / wp_schedule_single_event
-        // We return immediately and let the stream endpoint deliver the AI response.
+        // Trigger AI pipeline — the SSE stream endpoint delivers the response in real time.
+        // Also schedule a cron fallback in case the SSE stream isn't opened.
         $auto_reply = Michelle_AI_Settings::get( 'auto_reply', true );
         $api_key    = Michelle_AI_Settings::get_api_key();
 
         if ( $auto_reply && $api_key ) {
-            // Schedule AI response for ~1s from now (gives REST response time to return)
-            wp_schedule_single_event( time(), 'michelle_ai_generate_response', [ $conv_id ] );
+            wp_schedule_single_event( time() + 5, 'michelle_ai_generate_response', [ $conv_id ] );
         }
+
+        // Run data extraction immediately on the visitor's message.
+        // This ensures names/data are captured even if the AI response fails.
+        Michelle_AI::maybe_extract_data( $conv_id );
 
         return rest_ensure_response( [ 'ok' => true ] );
     }
@@ -308,12 +330,22 @@ class Michelle_AI_Chat {
             CURLOPT_TIMEOUT => 120,
         ] );
 
-        curl_exec( $ch );
+        $curl_ok = curl_exec( $ch );
+        if ( $curl_ok === false ) {
+            error_log( 'Michelle AI: SSE curl error — ' . curl_error( $ch ) );
+        }
+        $http_code = (int) curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+        if ( $http_code >= 400 ) {
+            error_log( 'Michelle AI: OpenAI returned HTTP ' . $http_code . ' during SSE stream' );
+        }
         curl_close( $ch );
 
         // Save the completed AI response to DB
         if ( $full_text ) {
-            $pending_mod = (bool) $mod;
+            // When auto_reply is on the visitor already received the tokens via
+            // the stream, so moderation is skipped. Moderation only applies when
+            // auto_reply is off (admin-driven workflow).
+            $pending_mod = $mod && ! $auto;
             $msg_id = Michelle_AI_DB::add_message( $conv_id, 'ai', $full_text, [
                 'is_pending_mod' => $pending_mod ? 1 : 0,
             ] );
@@ -336,6 +368,9 @@ class Michelle_AI_Chat {
                     flush();
                 }
             }
+
+            // Run data extraction
+            Michelle_AI::maybe_extract_data( $conv_id );
         }
 
         exit;
@@ -410,11 +445,18 @@ class Michelle_AI_Chat {
 
         Michelle_AI_DB::mark_read( $conv_id );
 
-        $messages = Michelle_AI_DB::get_messages( $conv_id );
+        $messages       = Michelle_AI_DB::get_messages( $conv_id );
+        $extracted_data = Michelle_AI_DB::get_extracted_data( $conv_id );
+
+        $extracted = [];
+        foreach ( $extracted_data as $ed ) {
+            $extracted[ $ed->property_key ] = $ed->property_value;
+        }
 
         return rest_ensure_response( [
-            'conversation' => Michelle_AI_DB::format_conversation( $conv ),
-            'messages'     => array_map( [ Michelle_AI_DB::class, 'format_message' ], $messages ),
+            'conversation'   => Michelle_AI_DB::format_conversation( $conv ),
+            'messages'       => array_map( [ Michelle_AI_DB::class, 'format_message' ], $messages ),
+            'extracted_data' => $extracted,
         ] );
     }
 
@@ -435,6 +477,21 @@ class Michelle_AI_Chat {
         }
 
         return rest_ensure_response( [ 'ok' => true ] );
+    }
+
+    public function admin_get_messages( $request ) {
+        $conv_id   = (int) $request->get_param( 'id' );
+        $before_id = $request->get_param( 'before' ) ? (int) $request->get_param( 'before' ) : null;
+        $limit     = $request->get_param( 'limit' ) ? (int) $request->get_param( 'limit' ) : 30;
+
+        $rows  = Michelle_AI_DB::get_messages_page( $conv_id, $limit, $before_id );
+        $total = Michelle_AI_DB::count_messages( $conv_id );
+
+        return rest_ensure_response( [
+            'messages'  => array_map( [ Michelle_AI_DB::class, 'format_message' ], $rows ),
+            'total'     => $total,
+            'has_older' => $before_id ? ( count( $rows ) >= $limit ) : false,
+        ] );
     }
 
     public function admin_send_message( $request ) {
@@ -522,6 +579,11 @@ class Michelle_AI_Chat {
             $val = $params[ $key ];
             // Don't overwrite key if masked
             if ( $key === 'openai_api_key' && $val === '••••••••' ) {
+                continue;
+            }
+            // Array fields (e.g. extraction_properties)
+            if ( $key === 'extraction_properties' ) {
+                $save[ $key ] = is_array( $val ) ? $val : [];
                 continue;
             }
             $save[ $key ] = is_bool( $val ) ? $val : sanitize_text_field( (string) $val );

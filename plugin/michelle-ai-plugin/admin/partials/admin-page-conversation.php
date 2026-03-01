@@ -12,11 +12,24 @@ if ( ! $conv ) {
 }
 
 Michelle_AI_DB::mark_read( $conv_id );
-$messages = Michelle_AI_DB::get_messages( $conv_id );
-$mod_mode = Michelle_AI_Settings::get( 'moderation_mode', false );
+$page_size      = 30;
+$messages       = Michelle_AI_DB::get_messages_page( $conv_id, $page_size );
+$total_msgs     = Michelle_AI_DB::count_messages( $conv_id );
+$has_older      = $total_msgs > count( $messages );
+$mod_mode       = Michelle_AI_Settings::get( 'moderation_mode', false );
+$extracted_data = Michelle_AI_DB::get_extracted_data( $conv_id );
 
 $name  = $conv->visitor_name  ?: __( 'Anonymous', 'michelle-ai-plugin' );
 $email = $conv->visitor_email ?: __( 'No email', 'michelle-ai-plugin' );
+
+// Build a label map from configured extraction properties
+$prop_labels = [];
+$props = Michelle_AI_Settings::get( 'extraction_properties', [] );
+if ( is_array( $props ) ) {
+    foreach ( $props as $p ) {
+        $prop_labels[ $p['key'] ] = $p['label'] ?? $p['key'];
+    }
+}
 ?>
 
 <div class="mai-detail-header">
@@ -33,8 +46,32 @@ $email = $conv->visitor_email ?: __( 'No email', 'michelle-ai-plugin' );
     </div>
 </div>
 
+<?php if ( $extracted_data ) : ?>
+<div class="mai-extracted-data">
+    <h4><?php esc_html_e( 'Extracted Data', 'michelle-ai-plugin' ); ?></h4>
+    <table class="mai-extracted-table">
+        <?php foreach ( $extracted_data as $ed ) :
+            $label = $prop_labels[ $ed->property_key ] ?? $ed->property_key;
+        ?>
+            <tr>
+                <td><?php echo esc_html( $label ); ?></td>
+                <td><?php echo esc_html( $ed->property_value ); ?></td>
+            </tr>
+        <?php endforeach; ?>
+    </table>
+</div>
+<?php endif; ?>
+
 <!-- Message thread -->
-<div class="mai-detail-messages" id="mai-detail-messages">
+<div class="mai-detail-messages" id="mai-detail-messages"
+     data-conv-id="<?php echo (int) $conv_id; ?>"
+     data-has-older="<?php echo $has_older ? '1' : '0'; ?>"
+     data-visitor-name="<?php echo esc_attr( $name ); ?>">
+    <?php if ( $has_older ) : ?>
+        <div class="mai-load-older" id="mai-load-older">
+            <button class="button-link" id="mai-load-older-btn"><?php esc_html_e( 'Load older messages…', 'michelle-ai-plugin' ); ?></button>
+        </div>
+    <?php endif; ?>
     <?php foreach ( $messages as $msg ) :
         $is_pending = (bool) $msg->is_pending_mod;
         $bubble_cls = 'mai-admin-bubble mai-bubble-' . esc_attr( $msg->sender_type );

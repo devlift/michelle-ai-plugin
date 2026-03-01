@@ -237,6 +237,85 @@
 #temperature { vertical-align: middle; }
 output { margin-left: 8px; font-size: 14px; font-weight: 600; }
 
+/* Extraction property rows */
+.mai-prop-row {
+    display:     flex;
+    gap:         8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.mai-prop-key {
+    width:       140px;
+    font-size:   13px;
+    font-family: monospace;
+}
+.mai-prop-label {
+    width: 160px;
+    font-size: 13px;
+}
+.mai-prop-prompt {
+    flex:      1;
+    font-size: 13px;
+}
+.mai-prop-key,
+.mai-prop-label,
+.mai-prop-prompt {
+    padding:       6px 10px;
+    border:        1px solid #dcdcde;
+    border-radius: 4px;
+}
+.mai-prop-remove {
+    flex-shrink: 0;
+    line-height: 1;
+    font-size:   18px;
+    padding:     4px 8px !important;
+    color:       #d63638;
+}
+.mai-prop-remove:hover { color: #a00; }
+
+/* Extracted data panel in conversation detail */
+.mai-extracted-data {
+    padding:      12px 16px;
+    border-top:   1px solid #e2e8f0;
+    background:   #f8fafc;
+    flex-shrink:  0;
+}
+.mai-extracted-data h4 {
+    margin:       0 0 8px;
+    font-size:    12px;
+    font-weight:  600;
+    color:        #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.mai-extracted-table {
+    width:         100%;
+    border-collapse: collapse;
+    font-size:     13px;
+}
+.mai-extracted-table td {
+    padding:       4px 8px;
+    border-bottom: 1px solid #e2e8f0;
+}
+.mai-extracted-table td:first-child {
+    font-weight:  600;
+    color:        #475569;
+    width:        120px;
+}
+
+/* Load older messages */
+.mai-load-older {
+    text-align: center;
+    padding:    8px 0 4px;
+    flex-shrink: 0;
+}
+.mai-load-older .button-link {
+    font-size: 12px;
+    color:     #6366f1;
+    cursor:    pointer;
+}
+.mai-load-older .button-link:hover { text-decoration: underline; }
+
 /* Spinner */
 .mai-spinner {
     display:  inline-block;

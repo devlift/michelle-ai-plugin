@@ -1,0 +1,40 @@
+name: Deploy to SiteGround
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy plugin via rsync
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SG_SSH_KEY }}
+          SSH_HOST: ${{ secrets.SG_SSH_HOST }}
+          SSH_USER: ${{ secrets.SG_SSH_USER }}
+          SSH_PORT: ${{ secrets.SG_SSH_PORT }}
+          DEPLOY_PATH: ${{ secrets.SG_DEPLOY_PATH }}
+        run: |
+          # Set up SSH key
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Disable strict host key checking for CI
+          echo -e "Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile=/dev/null" > ~/.ssh/config
+
+          # Rsync the plugin directory to SiteGround
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${SSH_PORT}" \
+            plugin/michelle-ai-plugin/ \
+            "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}michelle-ai-plugin/"
+
+          # Activate the plugin if not already active
+          ssh -i ~/.ssh/deploy_key -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" \
+            "cd ${DEPLOY_PATH}../../ && wp plugin activate michelle-ai-plugin 2>/dev/null || true"
+
+          echo "Deployed successfully!"

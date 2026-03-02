@@ -121,6 +121,13 @@ class Michelle_AI_Chat {
             'permission_callback' => '__return_true',
         ] );
 
+        // Save audio transcript messages (batch, from frontend after voice session)
+        register_rest_route( self::NS, '/conversations/(?P<id>\d+)/audio-transcript', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'save_audio_transcript' ],
+            'permission_callback' => [ $this, 'verify_visitor_token' ],
+        ] );
+
         // Widget config (public — branding data for frontend)
         register_rest_route( self::NS, '/widget-config', [
             'methods'             => 'GET',
@@ -670,6 +677,36 @@ class Michelle_AI_Chat {
 
         // No API key — return agent_id for public agent fallback
         return rest_ensure_response( [ 'agent_id' => $agent_id ] );
+    }
+
+    /**
+     * Batch-save audio transcript messages after a voice session ends.
+     * Does NOT trigger any AI response — purely persistence.
+     */
+    public function save_audio_transcript( $request ) {
+        $conv_id  = (int) $request->get_param( 'id' );
+        $params   = $request->get_json_params() ?: [];
+        $messages = $params['messages'] ?? [];
+
+        if ( ! is_array( $messages ) || empty( $messages ) ) {
+            return rest_ensure_response( [ 'ok' => true, 'saved' => 0 ] );
+        }
+
+        // Cap at 200 messages per batch to prevent abuse
+        $messages = array_slice( $messages, 0, 200 );
+        $saved    = 0;
+
+        foreach ( $messages as $msg ) {
+            $sender  = ( $msg['sender_type'] ?? '' ) === 'visitor' ? 'visitor' : 'ai';
+            $content = sanitize_textarea_field( $msg['content'] ?? '' );
+            if ( ! $content ) {
+                continue;
+            }
+            Michelle_AI_DB::add_message( $conv_id, $sender, $content );
+            $saved++;
+        }
+
+        return rest_ensure_response( [ 'ok' => true, 'saved' => $saved ] );
     }
 
     public function widget_config( $request ) {

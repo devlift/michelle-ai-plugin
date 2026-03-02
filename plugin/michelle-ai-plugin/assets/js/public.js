@@ -669,6 +669,25 @@
     // Track the streaming agent bubble during audio transcription
     let audioAgentBubble = null;
     let audioAgentText   = '';
+    let audioTranscripts = [];  // Buffer for saving transcripts to DB
+
+    /**
+     * Collect existing chat messages from the DOM for passing as context
+     * to the audio agent so it knows what's been discussed.
+     */
+    function collectChatHistory() {
+        const msgEls = messagesEl.querySelectorAll('.mai-message');
+        const lines = [];
+        msgEls.forEach(el => {
+            const bubble = el.querySelector('.mai-bubble');
+            if (!bubble) return;
+            const text = bubble.textContent.trim();
+            if (!text) return;
+            const isVisitor = el.classList.contains('mai-from-visitor');
+            lines.push((isVisitor ? 'User' : 'Agent') + ': ' + text);
+        });
+        return lines.join('\n');
+    }
 
     async function startAudio() {
         const panel     = document.getElementById('mai-audio-panel');
@@ -679,6 +698,7 @@
 
         // Mark as active but don't show panel yet — wait for onConnect
         state.audioActive = true;
+        audioTranscripts = [];
         if (audioBtn) audioBtn.classList.add('mai-audio-active');
 
         try {
@@ -691,6 +711,9 @@
             // Load SDK
             await loadElevenLabsSDK();
             const Conversation = window.__ElevenLabsConversation;
+
+            // Collect prior chat history to pass as context
+            const chatHistory = collectChatHistory();
 
             // Start the conversation session
             const sessionOpts = {
@@ -728,6 +751,13 @@
                 },
             };
 
+            // Pass prior chat history so the voice agent has full context
+            if (chatHistory) {
+                sessionOpts.dynamicVariables = {
+                    conversation_history: chatHistory,
+                };
+            }
+
             if (res.signed_url) {
                 sessionOpts.signedUrl = res.signed_url;
             } else if (res.agent_id) {
@@ -763,6 +793,9 @@
                 content:     message,
                 created_at:  new Date().toISOString(),
             });
+
+            // Buffer for DB persistence
+            audioTranscripts.push({ sender_type: 'visitor', content: message });
         } else if (source === 'ai') {
             // Agent transcript — update or create a streaming bubble
             if (!audioAgentBubble) {
@@ -791,6 +824,10 @@
                 content.appendChild(meta);
             }
         }
+        // Buffer the finalized agent message for DB persistence
+        if (audioAgentText) {
+            audioTranscripts.push({ sender_type: 'ai', content: audioAgentText });
+        }
         audioAgentBubble = null;
         audioAgentText   = '';
     }
@@ -814,6 +851,9 @@
         // Finalize any pending agent bubble
         if (audioAgentBubble) finalizeAudioAgentBubble();
 
+        // Persist audio transcripts to the database
+        saveAudioTranscripts();
+
         state.audioActive = false;
         audioMuted = false;
 
@@ -830,6 +870,16 @@
         }
 
         requestAnimationFrame(() => scrollToBottom());
+    }
+
+    /** Batch-save buffered audio transcripts to the server */
+    function saveAudioTranscripts() {
+        if (!audioTranscripts.length || !state.conversationId) return;
+        const messages = audioTranscripts.slice();
+        audioTranscripts = [];
+        // Fire and forget — don't block UI
+        apiFetch(`/conversations/${state.conversationId}/audio-transcript`, 'POST', { messages })
+            .catch(err => console.warn('Failed to save audio transcripts:', err));
     }
 
     function toggleMute() {

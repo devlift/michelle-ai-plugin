@@ -597,28 +597,32 @@
    Audio
    ========================================================================= */
 
-/* Voice conversation button (below input area) */
+/* Mic toggle button (inside input wrapper, beside send) */
 .mai-audio-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--mai-muted);
+    border: none;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    width: 100%;
-    padding: 8px;
-    background: none;
-    border: none;
-    color: var(--mai-muted);
-    font-size: 12px;
-    font-family: var(--mai-font);
-    cursor: pointer;
-    transition: color .2s;
     flex-shrink: 0;
+    transition: background .2s, color .2s, transform .2s cubic-bezier(.34,1.56,.64,1);
+    padding: 0;
 }
-.mai-audio-btn:hover { color: var(--mai-primary); }
-.mai-audio-btn svg   { flex-shrink: 0; }
+.mai-audio-btn:hover  { color: var(--mai-primary); background: rgba(99,102,241,.08); }
+.mai-audio-btn:active { transform: scale(.9); }
+.mai-audio-btn svg    { width: 16px; height: 16px; }
 .mai-audio-btn.mai-audio-active {
-    color: var(--mai-primary);
-    font-weight: 500;
+    background: var(--mai-primary);
+    color: #fff;
+}
+.mai-audio-btn.mai-audio-active:hover {
+    background: var(--mai-primary);
+    filter: brightness(1.1);
 }
 
 /* Audio panel — compact bottom bar (replaces input area when voice active) */

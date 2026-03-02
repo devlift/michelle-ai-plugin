@@ -108,6 +108,16 @@ $welcome   = esc_html( Michelle_AI_Settings::get( 'welcome_message', '' ) );
                     aria-label="Message input"
                     maxlength="2000"
                 ></textarea>
+                <?php if ( Michelle_AI_Settings::get( 'audio_enabled', false ) ) : ?>
+                <button id="mai-audio-btn" class="mai-audio-btn" aria-label="Start voice conversation" title="Voice conversation">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+                <?php endif; ?>
                 <button id="mai-send-btn" class="mai-send-btn" aria-label="Send message">
                     <!-- Arrow up icon -->
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -116,19 +126,6 @@ $welcome   = esc_html( Michelle_AI_Settings::get( 'welcome_message', '' ) );
                 </button>
             </div>
         </div>
-
-        <?php if ( Michelle_AI_Settings::get( 'audio_enabled', false ) ) : ?>
-        <!-- Voice conversation button -->
-        <button id="mai-audio-btn" class="mai-audio-btn" aria-label="Start voice conversation">
-            <svg viewBox="0 0 24 24" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            <span>Voice conversation</span>
-        </button>
-        <?php endif; ?>
 
         <!-- Audio bar (hidden by default, replaces input area once voice connected) -->
         <div id="mai-audio-panel" class="mai-audio-panel" hidden>

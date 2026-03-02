@@ -13,6 +13,7 @@ $secondary = esc_attr( Michelle_AI_Settings::get( 'secondary_color', '#f1f5f9' )
 $title     = esc_html( Michelle_AI_Settings::get( 'widget_title', 'Chat with us' ) );
 $agent     = esc_html( Michelle_AI_Settings::get( 'agent_name', 'Support' ) );
 $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
+$welcome   = esc_html( Michelle_AI_Settings::get( 'welcome_message', '' ) );
 ?>
 <style>
 :root {
@@ -55,16 +56,6 @@ $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
                     </span>
                 </div>
             </div>
-            <?php if ( Michelle_AI_Settings::get( 'audio_enabled', false ) ) : ?>
-            <button class="mai-audio-btn" aria-label="Start voice conversation" id="mai-audio-btn" title="Voice conversation">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-            </button>
-            <?php endif; ?>
             <button class="mai-close-btn" aria-label="Close chat" id="mai-close-btn">
                 <!-- Chevron down icon -->
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -75,6 +66,20 @@ $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
 
         <!-- Messages area -->
         <div id="mai-messages" class="mai-messages" role="log" aria-live="polite">
+            <!-- Welcome state (hidden once messages load) -->
+            <div id="mai-welcome" class="mai-welcome">
+                <?php if ( $logo_url ) : ?>
+                    <img src="<?php echo $logo_url; ?>" class="mai-welcome-avatar" alt="<?php echo $agent; ?>" />
+                <?php else : ?>
+                    <span class="mai-welcome-avatar mai-welcome-avatar-default"><?php echo mb_substr( $agent, 0, 1 ); ?></span>
+                <?php endif; ?>
+                <strong class="mai-welcome-name"><?php echo $agent; ?></strong>
+                <?php if ( $welcome ) : ?>
+                    <p class="mai-welcome-text"><?php echo $welcome; ?></p>
+                <?php else : ?>
+                    <p class="mai-welcome-text">Hi there! How can I help you today?</p>
+                <?php endif; ?>
+            </div>
             <!-- Messages injected by JS -->
         </div>
 
@@ -111,6 +116,19 @@ $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );
                 </button>
             </div>
         </div>
+
+        <?php if ( Michelle_AI_Settings::get( 'audio_enabled', false ) ) : ?>
+        <!-- Voice conversation button -->
+        <button id="mai-audio-btn" class="mai-audio-btn" aria-label="Start voice conversation">
+            <svg viewBox="0 0 24 24" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>Voice conversation</span>
+        </button>
+        <?php endif; ?>
 
         <!-- Audio bar (hidden by default, replaces input area once voice connected) -->
         <div id="mai-audio-panel" class="mai-audio-panel" hidden>

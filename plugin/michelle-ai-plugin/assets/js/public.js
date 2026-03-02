@@ -218,7 +218,14 @@
     // -------------------------------------------------------------------------
     // Message rendering
     // -------------------------------------------------------------------------
+    function hideWelcome() {
+        const w = document.getElementById('mai-welcome');
+        if (w) w.remove();
+    }
+
     function appendMessage(msg) {
+        hideWelcome();
+
         const wrap = document.createElement('div');
         wrap.className = `mai-message mai-from-${msg.sender_type}`;
         wrap.dataset.id = msg.id;
@@ -718,9 +725,10 @@
             // Start the conversation session
             const sessionOpts = {
                 onConnect: () => {
-                    // NOW show the audio bar and hide the text input
+                    // NOW show the audio bar and hide the text input + voice button
                     panel.hidden = false;
                     document.querySelector('.mai-input-area')?.classList.add('mai-hidden');
+                    if (audioBtn) audioBtn.classList.add('mai-hidden');
                     if (modeLabel) modeLabel.textContent = 'Listening...';
                     if (modeEl) modeEl.dataset.mode = 'listening';
                     audioMode = 'listening';
@@ -859,9 +867,12 @@
 
         if (panel) panel.hidden = true;
 
-        // Restore text input
+        // Restore text input + voice button
         document.querySelector('.mai-input-area')?.classList.remove('mai-hidden');
-        if (audioBtn) audioBtn.classList.remove('mai-audio-active');
+        if (audioBtn) {
+            audioBtn.classList.remove('mai-audio-active');
+            audioBtn.classList.remove('mai-hidden');
+        }
 
         // Reset mute button
         const muteBtn = document.getElementById('mai-audio-mute');

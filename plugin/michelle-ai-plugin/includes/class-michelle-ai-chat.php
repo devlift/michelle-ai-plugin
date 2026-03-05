@@ -117,6 +117,13 @@ class Michelle_AI_Chat {
             ],
         ] );
 
+        // CSV export of extracted data (admin)
+        register_rest_route( self::NS, '/admin/export-csv', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'admin_export_csv' ],
+            'permission_callback' => [ $this, 'require_admin' ],
+        ] );
+
         // Audio signed URL (public, rate-limited)
         register_rest_route( self::NS, '/audio/signed-url', [
             'methods'             => 'GET',
@@ -592,6 +599,75 @@ class Michelle_AI_Chat {
         }
 
         return rest_ensure_response( [ 'ok' => true ] );
+    }
+
+    public function admin_export_csv( $request ) {
+        global $wpdb;
+
+        // Get all extraction property keys and labels for column headers
+        $props = Michelle_AI_Settings::get( 'extraction_properties', [] );
+        $prop_keys   = [];
+        $prop_labels = [];
+        if ( is_array( $props ) ) {
+            foreach ( $props as $p ) {
+                $prop_keys[]                = $p['key'];
+                $prop_labels[ $p['key'] ]   = $p['label'] ?? $p['key'];
+            }
+        }
+
+        // Get all conversations with their extracted data
+        $convs = Michelle_AI_DB::get_conversations( [ 'limit' => 1000 ] );
+        $extracted_table = Michelle_AI_DB::extracted_data_table();
+
+        // Build CSV in memory
+        $output = fopen( 'php://temp', 'r+' );
+
+        // Header row
+        $headers = [ 'Conversation ID', 'Visitor Name', 'Status', 'Created At' ];
+        foreach ( $prop_keys as $k ) {
+            $headers[] = $prop_labels[ $k ];
+        }
+        fputcsv( $output, $headers );
+
+        // Data rows
+        foreach ( $convs as $conv ) {
+            $ed_rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT property_key, property_value FROM $extracted_table WHERE conversation_id = %d",
+                $conv->id
+            ) );
+            $ed = [];
+            foreach ( $ed_rows as $r ) {
+                $ed[ $r->property_key ] = $r->property_value;
+            }
+
+            // Skip conversations with no extracted data
+            if ( empty( $ed ) ) {
+                continue;
+            }
+
+            $row = [
+                $conv->id,
+                $conv->visitor_name ?: 'Anonymous',
+                $conv->status,
+                $conv->created_at,
+            ];
+            foreach ( $prop_keys as $k ) {
+                $row[] = $ed[ $k ] ?? '';
+            }
+            fputcsv( $output, $row );
+        }
+
+        rewind( $output );
+        $csv = stream_get_contents( $output );
+        fclose( $output );
+
+        $filename = 'michelle-ai-conversations-' . gmdate( 'Y-m-d' ) . '.csv';
+
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+        header( 'Cache-Control: no-store' );
+        echo $csv;
+        exit;
     }
 
     public function admin_get_settings( $request ) {

@@ -10,6 +10,9 @@ $conversations = Michelle_AI_DB::get_conversations( [ 'limit' => 100 ] );
     <h1 class="wp-heading-inline">
         <?php esc_html_e( 'Conversations', 'michelle-ai-plugin' ); ?>
     </h1>
+    <a id="mai-export-csv-btn" class="page-title-action" href="<?php echo esc_url( rest_url( 'michelle-ai/v1/admin/export-csv' ) . '?_wpnonce=' . wp_create_nonce( 'wp_rest' ) ); ?>">
+        <?php esc_html_e( 'Download CSV', 'michelle-ai-plugin' ); ?>
+    </a>
 
     <div class="mai-admin-layout">
 

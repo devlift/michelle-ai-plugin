@@ -37,4 +37,8 @@ jobs:
           ssh -i ~/.ssh/deploy_key -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" \
             "cd ${DEPLOY_PATH}../../ && wp plugin activate michelle-ai-plugin 2>/dev/null || true"
 
+          # Purge SiteGround dynamic cache so updated JS/CSS is served immediately
+          ssh -i ~/.ssh/deploy_key -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" \
+            "cd ${DEPLOY_PATH}../../ && wp eval 'if (class_exists(\"SiteGround_Optimizer\\\\Supercacher\\\\Supercacher\")) { SiteGround_Optimizer\\\\Supercacher\\\\Supercacher::purge_cache(); }' 2>/dev/null || true"
+
           echo "Deployed successfully!"

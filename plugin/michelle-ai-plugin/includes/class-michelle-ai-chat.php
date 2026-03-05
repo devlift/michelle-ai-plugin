@@ -387,8 +387,10 @@ class Michelle_AI_Chat {
             Michelle_AI::maybe_extract_data( $conv_id );
         }
 
-        // Send [DONE] last so the client stays connected for quick replies
-        echo "data: [DONE]\n\n";
+        // Send [DONE] with the saved message ID so the client can tag the
+        // streaming bubble for dedup against subsequent poll responses.
+        $done_payload = isset( $msg_id ) ? wp_json_encode( [ 'done' => true, 'msg_id' => $msg_id ] ) : '[DONE]';
+        echo "data: $done_payload\n\n";
         flush();
 
         exit;

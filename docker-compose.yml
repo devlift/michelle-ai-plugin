@@ -42,6 +42,7 @@ services:
       - ./plugin/michelle-ai-plugin:/var/www/html/wp-content/plugins/michelle-ai-plugin
       - ./uploads:/var/www/html/wp-content/uploads
       - ./config/apache-wordpress.conf:/etc/apache2/conf-enabled/wordpress-override.conf:ro
+      - ./config/php-uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
     networks:
       - wordpress_net
 

@@ -228,21 +228,25 @@
         if (!text) return;
         try {
             input.value = '';
-            await apiPost(`/admin/conversations/${convId}/messages`, { content: text });
-            appendAdminBubble(text);
+            const res = await apiPost(`/admin/conversations/${convId}/messages`, { content: text });
+            appendAdminBubble(text, res.msg_id);
         } catch(err) {
             alert('Failed to send: ' + err.message);
         }
     }
 
-    function appendAdminBubble(text) {
+    function appendAdminBubble(text, msgId) {
         const thread = document.getElementById('mai-detail-messages');
         if (!thread) return;
         const el = document.createElement('div');
         el.className = 'mai-admin-bubble mai-bubble-admin';
+        if (msgId) el.dataset.msgId = msgId;
         el.innerHTML = `<div class="mai-bubble-sender">Admin <span class="mai-bubble-time">${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></div><div class="mai-bubble-text">${escHtml(text)}</div>`;
         thread.appendChild(el);
         thread.scrollTop = thread.scrollHeight;
+
+        // Register in detail polling's known IDs so it won't be duplicated
+        if (msgId && detailKnownIds) detailKnownIds.add(msgId);
     }
 
     // -------------------------------------------------------------------------
@@ -330,11 +334,9 @@
     let lastKnownConvs   = new Set();
     let adminPollTimer   = null;
     let notifGranted     = false;
+    let detailKnownIds   = null;  // Set of message IDs in the detail view
 
     function initAdminPolling() {
-        // Only poll on the conversations page
-        if (!document.querySelector('.mai-conv-list')) return;
-
         if ('Notification' in window) {
             if (Notification.permission === 'granted') {
                 notifGranted = true;
@@ -343,12 +345,16 @@
             }
         }
 
-        // Seed known conversations
-        document.querySelectorAll('.mai-conv-item').forEach(el => {
-            lastKnownConvs.add(parseInt(el.dataset.id, 10));
-        });
+        // Poll the conversation list page
+        if (document.querySelector('.mai-conv-list')) {
+            document.querySelectorAll('.mai-conv-item').forEach(el => {
+                lastKnownConvs.add(parseInt(el.dataset.id, 10));
+            });
+            adminPollTimer = setInterval(pollConversations, 3000);
+        }
 
-        adminPollTimer = setInterval(pollConversations, 3000);
+        // Poll for new messages when viewing a conversation detail
+        initDetailPolling();
     }
 
     async function pollConversations() {
@@ -381,6 +387,49 @@
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Detail-view polling: auto-fetch new messages while viewing a conversation
+    // -------------------------------------------------------------------------
+    function initDetailPolling() {
+        const thread = document.getElementById('mai-detail-messages');
+        if (!thread) return;
+
+        const convId = parseInt(thread.dataset.convId, 10);
+        if (!convId) return;
+
+        const visitorName = thread.dataset.visitorName || 'Anonymous';
+
+        // Collect existing message IDs into the module-level set
+        detailKnownIds = new Set();
+        thread.querySelectorAll('.mai-admin-bubble[data-msg-id]').forEach(el => {
+            detailKnownIds.add(parseInt(el.dataset.msgId, 10));
+        });
+
+        setInterval(async () => {
+            try {
+                const res = await apiGet(`/admin/conversations/${convId}`);
+                const msgs = res.messages || [];
+                let hasNew = false;
+
+                msgs.forEach(msg => {
+                    if (detailKnownIds.has(msg.id)) return;
+                    detailKnownIds.add(msg.id);
+                    hasNew = true;
+
+                    const el = buildAdminBubbleEl(msg, visitorName);
+                    thread.appendChild(el);
+                });
+
+                if (hasNew) {
+                    thread.scrollTop = thread.scrollHeight;
+                    fireAdminNotification('New message', visitorName);
+                }
+            } catch (e) {
+                // silent
+            }
+        }, 3000);
+    }
+
     function fireAdminNotification(title, body) {
         if (notifGranted && !document.hasFocus()) {
             const n = new Notification('Michelle AI — ' + title, { body });
@@ -393,15 +442,22 @@
     function playNotifSound() {
         try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
             const gain = ctx.createGain();
-            osc.connect(gain);
             gain.connect(ctx.destination);
-            osc.frequency.value = 880;
-            gain.gain.setValueAtTime(0.3, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.4);
+
+            // Two-tone chime: C6 then E6
+            const freqs = [1047, 1319];
+            freqs.forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                osc.connect(gain);
+                const start = ctx.currentTime + i * 0.15;
+                gain.gain.setValueAtTime(0.25, start);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+                osc.start(start);
+                osc.stop(start + 0.3);
+            });
         } catch(e) {}
     }
 

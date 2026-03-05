@@ -77,6 +77,7 @@
         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
+
     function scrollToBottom() {
         messagesEl.scrollTop = messagesEl.scrollHeight;
     }
@@ -117,6 +118,7 @@
     }
 
     function fireNotification(text) {
+        playMessageSound();
         if (!state.notifGranted || document.hasFocus()) return;
         const n = new Notification(cfg.widgetTitle || 'New message', {
             body: text,
@@ -124,6 +126,27 @@
         });
         n.onclick = () => { window.focus(); openWidget(); n.close(); };
         setTimeout(() => n.close(), 6000);
+    }
+
+    /** Soft three-note chime (G5 → B5 → D6) — gentler than the admin alert. */
+    function playMessageSound() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const gain = ctx.createGain();
+            gain.connect(ctx.destination);
+
+            [784, 988, 1175].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                osc.connect(gain);
+                const t = ctx.currentTime + i * 0.12;
+                gain.gain.setValueAtTime(0.15, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+                osc.start(t);
+                osc.stop(t + 0.25);
+            });
+        } catch (e) {}
     }
 
     // -------------------------------------------------------------------------
@@ -350,7 +373,9 @@
             openStream();
         } else {
             sendBtn.disabled = false;
-            state.lastPollTime = new Date().toISOString();
+            // Don't update lastPollTime with client time — the server stores
+            // timestamps in WP local timezone which may differ from browser UTC.
+            // Keep the existing server-derived lastPollTime; dedup handles duplicates.
             startPolling();
         }
     }
@@ -370,16 +395,25 @@
         let fullText = '';
 
         es.onmessage = (e) => {
+            // Handle both legacy "[DONE]" and new JSON done payload
+            let data;
             if (e.data === '[DONE]') {
+                data = { done: true };
+            } else {
+                data = JSON.parse(e.data);
+            }
+
+            if (data.done) {
                 es.close();
                 typingEl.hidden = true;
                 state.streaming = false;
                 sendBtn.disabled = false;
 
-                // Finalize streaming bubble timestamp
+                // Tag the streaming bubble with the server message ID for dedup
                 if (bubble) {
                     const wrap = document.getElementById('mai-streaming-bubble');
                     if (wrap) {
+                        if (data.msg_id) wrap.dataset.id = data.msg_id;
                         wrap.removeAttribute('id');
                         const content = wrap.querySelector('.mai-msg-content');
                         if (content) {
@@ -391,13 +425,12 @@
                     }
                 }
 
-                // Update last poll time and resume polling
-                state.lastPollTime = new Date().toISOString();
+                // Resume polling — keep existing server-derived lastPollTime
+                // so the next poll picks up any admin messages. Dedup prevents
+                // the saved AI message from appearing twice.
                 startPolling();
                 return;
             }
-
-            const data = JSON.parse(e.data);
 
             if (data.token !== undefined) {
                 if (!bubble) {

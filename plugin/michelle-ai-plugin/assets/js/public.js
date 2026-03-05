@@ -10,7 +10,7 @@
     // -------------------------------------------------------------------------
     const cfg = window.michelleAICfg || {};
     const API = cfg.restUrl || '';   // e.g. https://site.com/wp-json/michelle-ai/v1
-    const chatEnabled = cfg.chatEnabled !== false;
+    const chatEnabled = !!cfg.chatEnabled;
 
     // -------------------------------------------------------------------------
     // State
@@ -367,7 +367,8 @@
         }
 
         // Only show typing and open SSE stream if AI auto-reply is enabled
-        if (cfg.autoReply !== false) {
+        // Note: wp_localize_script converts false to "" so we check truthiness
+        if (cfg.autoReply) {
             typingEl.hidden = false;
             scrollToBottom();
             openStream();

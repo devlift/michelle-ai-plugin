@@ -329,6 +329,49 @@
     }
 
     // -------------------------------------------------------------------------
+    // Auto-generate suggestion + refresh extracted data
+    // -------------------------------------------------------------------------
+    async function autoGenerateSuggestion(convId) {
+        const textarea = document.getElementById('mai-suggestion-text');
+        const regenBtn = document.getElementById('mai-regenerate-btn');
+        if (!textarea || !regenBtn) return;
+        regenBtn.textContent = '↻ Loading…';
+        regenBtn.disabled = true;
+        try {
+            const res = await apiPost(`/admin/conversations/${convId}/suggest`, {});
+            textarea.value = res.suggestion || '';
+        } catch(e) {
+            // silent — admin can still click Regenerate manually
+        }
+        regenBtn.textContent = '↻ Regenerate';
+        regenBtn.disabled = false;
+    }
+
+    function updateExtractedData(data) {
+        if (!data || !Object.keys(data).length) return;
+        const labels = cfg.propLabels || {};
+        // Build or update the extracted data table
+        let table = document.querySelector('.mai-extracted-table');
+        if (!table) {
+            // Create the section if it doesn't exist yet
+            const section = document.createElement('div');
+            section.className = 'mai-extracted-data';
+            section.innerHTML = '<h4>Extracted Data</h4><table class="mai-extracted-table"></table>';
+            const header = document.querySelector('.mai-detail-header');
+            if (header) header.after(section);
+            table = section.querySelector('.mai-extracted-table');
+        }
+        // Replace table contents with latest data
+        table.innerHTML = '';
+        for (const [key, val] of Object.entries(data)) {
+            const tr = document.createElement('tr');
+            const label = labels[key] || key;
+            tr.innerHTML = `<td>${escHtml(label)}</td><td>${escHtml(val)}</td>`;
+            table.appendChild(tr);
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Admin polling (new conversations / messages)
     // -------------------------------------------------------------------------
     let lastKnownConvs   = new Set();
@@ -411,10 +454,12 @@
                 const msgs = res.messages || [];
                 let hasNew = false;
 
+                let hasNewVisitor = false;
                 msgs.forEach(msg => {
                     if (detailKnownIds.has(msg.id)) return;
                     detailKnownIds.add(msg.id);
                     hasNew = true;
+                    if (msg.sender_type === 'visitor') hasNewVisitor = true;
 
                     const el = buildAdminBubbleEl(msg, visitorName);
                     thread.appendChild(el);
@@ -423,6 +468,16 @@
                 if (hasNew) {
                     thread.scrollTop = thread.scrollHeight;
                     fireAdminNotification('New message', visitorName);
+                }
+
+                // Auto-generate AI suggestion when a new visitor message arrives
+                if (hasNewVisitor) {
+                    autoGenerateSuggestion(convId);
+                }
+
+                // Refresh extracted data panel
+                if (hasNew && res.extracted_data) {
+                    updateExtractedData(res.extracted_data);
                 }
             } catch (e) {
                 // silent

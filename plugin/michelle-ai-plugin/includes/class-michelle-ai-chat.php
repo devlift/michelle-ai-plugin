@@ -12,6 +12,9 @@ class Michelle_AI_Chat {
     const NS = 'michelle-ai/v1';
 
     public function register_routes() {
+        // Prevent SiteGround / nginx proxy from caching REST responses
+        add_filter( 'rest_post_dispatch', [ $this, 'nocache_headers' ], 10, 3 );
+
         // ── Visitor (public) endpoints ────────────────────────────────────────
 
         register_rest_route( self::NS, '/conversations', [
@@ -163,6 +166,19 @@ class Michelle_AI_Chat {
         }
 
         return true;
+    }
+
+    /**
+     * Set no-cache headers on all michelle-ai REST responses to prevent
+     * SiteGround / nginx proxy from caching polling results.
+     */
+    public function nocache_headers( $result, $server, $request ) {
+        if ( strpos( $request->get_route(), '/' . self::NS ) === 0 ) {
+            header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+            header( 'Pragma: no-cache' );
+            header( 'Expires: 0' );
+        }
+        return $result;
     }
 
     // =========================================================================

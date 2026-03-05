@@ -33,10 +33,19 @@ class Michelle_AI_Admin {
             true
         );
 
+        $prop_labels = [];
+        $props = Michelle_AI_Settings::get( 'extraction_properties', [] );
+        if ( is_array( $props ) ) {
+            foreach ( $props as $p ) {
+                $prop_labels[ $p['key'] ] = $p['label'] ?? $p['key'];
+            }
+        }
+
         wp_localize_script( 'michelle-ai-admin', 'michelleAIAdmin', [
             'restUrl'    => esc_url_raw( rest_url( 'michelle-ai/v1' ) ),
             'nonce'      => wp_create_nonce( 'wp_rest' ),
             'notifSound' => (bool) Michelle_AI_Settings::get( 'notification_sound', true ),
+            'propLabels' => $prop_labels,
         ] );
     }
 

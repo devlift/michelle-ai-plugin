@@ -1,4 +1,4 @@
-.PHONY: up down restart logs shell db-shell ps clean
+.PHONY: up down restart logs shell db-shell ps clean seed snapshot
 
 ## Start the WordPress environment
 up:
@@ -58,3 +58,12 @@ deactivate:
 ## Tail WordPress debug log
 debug-log:
 	docker exec michelle_ai_wordpress tail -f /var/www/html/wp-content/debug.log
+
+## Seed the database with content, settings, and plugins (run after `make up`)
+seed:
+	bash seed/seed.sh
+
+## Snapshot current local DB into seed/database.sql (run before committing)
+snapshot:
+	docker-compose exec -T db mysqldump -u wordpress -pwordpress wordpress > seed/database.sql
+	@echo "Snapshot saved to seed/database.sql"

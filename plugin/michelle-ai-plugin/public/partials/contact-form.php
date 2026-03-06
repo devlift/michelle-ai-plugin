@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-$primary   = esc_attr( Michelle_AI_Settings::get( 'primary_color', '#6366f1' ) );
+$primary   = esc_attr( Michelle_AI_Settings::get( 'primary_color', '#2563eb' ) );
 $secondary = esc_attr( Michelle_AI_Settings::get( 'secondary_color', '#f1f5f9' ) );
 $title     = esc_html( Michelle_AI_Settings::get( 'agent_name', 'Support' ) );
 $logo_url  = esc_url( Michelle_AI_Settings::get( 'logo_url', '' ) );

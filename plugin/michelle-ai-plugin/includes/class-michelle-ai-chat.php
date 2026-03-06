@@ -739,8 +739,8 @@ class Michelle_AI_Chat {
         body { padding: 0; }
         .no-print { display: none; }
     }
-    .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #6366f1; color: #fff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; font-family: sans-serif; font-size: 14px; z-index: 9999; }
-    .print-bar button { background: #fff; color: #6366f1; border: none; padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #2563eb; color: #fff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; font-family: sans-serif; font-size: 14px; z-index: 9999; }
+    .print-bar button { background: #fff; color: #2563eb; border: none; padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
     .print-bar button:hover { background: #f1f5f9; }
     @media print { .print-bar { display: none; } }
     body { padding-top: 60px; }

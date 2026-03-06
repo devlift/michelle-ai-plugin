@@ -954,7 +954,7 @@
         resize();
 
         const primaryColor = getComputedStyle(document.documentElement)
-            .getPropertyValue('--mai-primary').trim() || '#6366f1';
+            .getPropertyValue('--mai-primary').trim() || '#2563eb';
 
         function draw() {
             audioAnimFrame = requestAnimationFrame(draw);

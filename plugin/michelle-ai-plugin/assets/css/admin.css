@@ -67,10 +67,10 @@
     transition:  background .15s;
 }
 .mai-conv-item:hover       { background: #f1f5f9; }
-.mai-conv-item.mai-conv-active { background: #eff6ff; border-left: 3px solid #6366f1; }
+.mai-conv-item.mai-conv-active { background: #eff6ff; border-left: 3px solid #2563eb; }
 .mai-conv-avatar {
     width:         36px; height: 36px; border-radius: 50%;
-    background:    #6366f1; color: #fff;
+    background:    #2563eb; color: #fff;
     display:       flex; align-items: center; justify-content: center;
     font-weight:   700; font-size: 15px; flex-shrink: 0;
 }
@@ -81,7 +81,7 @@
 .mai-conv-unread .mai-conv-name { font-weight: 700; }
 .mai-unread-badge {
     width: 8px; height: 8px; border-radius: 50%;
-    background: #6366f1; flex-shrink: 0;
+    background: #2563eb; flex-shrink: 0;
 }
 
 /* Conversation detail */
@@ -216,7 +216,7 @@
     line-height: 1.5;
     transition:  border-color .2s;
 }
-.mai-admin-reply-input:focus { border-color: #6366f1; outline: none; }
+.mai-admin-reply-input:focus { border-color: #2563eb; outline: none; }
 
 /* Empty states */
 .mai-empty {
@@ -311,7 +311,7 @@ output { margin-left: 8px; font-size: 14px; font-weight: 600; }
 }
 .mai-load-older .button-link {
     font-size: 12px;
-    color:     #6366f1;
+    color:     #2563eb;
     cursor:    pointer;
 }
 .mai-load-older .button-link:hover { text-decoration: underline; }
@@ -358,7 +358,7 @@ output { margin-left: 8px; font-size: 14px; font-weight: 600; }
     display:  inline-block;
     width:    14px; height: 14px;
     border:   2px solid #e2e8f0;
-    border-top-color: #6366f1;
+    border-top-color: #2563eb;
     border-radius: 50%;
     animation: mai-spin .6s linear infinite;
     vertical-align: middle;

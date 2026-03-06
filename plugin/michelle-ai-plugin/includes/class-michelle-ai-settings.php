@@ -20,7 +20,7 @@ class Michelle_AI_Settings {
             'widget_title'     => 'Chat with us',
             'agent_name'       => 'Support',
             'welcome_message'  => 'Hi there! How can we help you today?',
-            'primary_color'    => '#6366f1',
+            'primary_color'    => '#2563eb',
             'secondary_color'  => '#f1f5f9',
             'logo_url'         => '',
             'fab_icon'         => 'bubble', // bubble | dots | message

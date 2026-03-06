@@ -3,7 +3,7 @@
    ========================================================================== */
 
 :root {
-    --mai-primary:       #6366f1;
+    --mai-primary:       #2563eb;
     --mai-secondary:     #f1f5f9;
     --mai-bg:            #ffffff;
     --mai-bg-light:      #f8f9fb;
@@ -613,7 +613,7 @@
     transition: background .2s, color .2s, transform .2s cubic-bezier(.34,1.56,.64,1);
     padding: 0;
 }
-.mai-audio-btn:hover  { color: var(--mai-primary); background: rgba(99,102,241,.08); }
+.mai-audio-btn:hover  { color: var(--mai-primary); background: rgba(37,99,235,.08); }
 .mai-audio-btn:active { transform: scale(.9); }
 .mai-audio-btn svg    { width: 16px; height: 16px; }
 .mai-audio-btn.mai-audio-active {

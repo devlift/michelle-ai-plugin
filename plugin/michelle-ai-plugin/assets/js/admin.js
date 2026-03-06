@@ -267,9 +267,7 @@
 
         // Toggle collapse/expand
         if (toggle && box) {
-            toggle.addEventListener('click', (e) => {
-                // Don't toggle if they clicked the Regenerate button
-                if (e.target.closest('#mai-regenerate-btn')) return;
+            toggle.addEventListener('click', () => {
                 box.classList.toggle('mai-suggestion-collapsed');
                 const label = toggle.querySelector('span');
                 if (label) {
@@ -280,7 +278,6 @@
         }
 
         regenBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
             // Auto-expand when generating
             if (box) {
                 box.classList.remove('mai-suggestion-collapsed');

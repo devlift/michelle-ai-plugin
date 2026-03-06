@@ -124,6 +124,20 @@ class Michelle_AI_Chat {
             'permission_callback' => [ $this, 'require_admin' ],
         ] );
 
+        // PDF document generation from template (admin)
+        register_rest_route( self::NS, '/admin/conversations/(?P<id>\d+)/generate-pdf', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'admin_generate_pdf' ],
+            'permission_callback' => [ $this, 'require_admin' ],
+            'args'                => [
+                'template' => [
+                    'type'              => 'integer',
+                    'required'          => true,
+                    'sanitize_callback' => 'absint',
+                ],
+            ],
+        ] );
+
         // Audio signed URL (public, rate-limited)
         register_rest_route( self::NS, '/audio/signed-url', [
             'methods'             => 'GET',
@@ -670,6 +684,84 @@ class Michelle_AI_Chat {
         exit;
     }
 
+    public function admin_generate_pdf( $request ) {
+        $conv_id      = (int) $request->get_param( 'id' );
+        $template_idx = (int) $request->get_param( 'template' );
+
+        $templates = Michelle_AI_Settings::get( 'document_templates', [] );
+        if ( ! isset( $templates[ $template_idx ] ) ) {
+            return new WP_Error( 'not_found', 'Template not found', [ 'status' => 404 ] );
+        }
+
+        $tpl  = $templates[ $template_idx ];
+        $conv = Michelle_AI_DB::get_conversation( $conv_id );
+        if ( ! $conv ) {
+            return new WP_Error( 'not_found', 'Conversation not found', [ 'status' => 404 ] );
+        }
+
+        // Build variable map from extracted data
+        $extracted_data = Michelle_AI_DB::get_extracted_data( $conv_id );
+        $vars = [];
+        foreach ( $extracted_data as $ed ) {
+            $vars[ $ed->property_key ] = $ed->property_value;
+        }
+        // Add built-in variables
+        $vars['visitor_name']  = $conv->visitor_name ?: '';
+        $vars['visitor_email'] = $conv->visitor_email ?: '';
+        $vars['date']          = current_time( 'F j, Y' );
+
+        // Replace {{handlebars}} in template content
+        $content = $tpl['content'] ?? '';
+        $content = preg_replace_callback( '/\{\{(\w+)\}\}/', function ( $m ) use ( $vars ) {
+            return esc_html( $vars[ $m[1] ] ?? '' );
+        }, $content );
+
+        $letterhead_url = Michelle_AI_Settings::get( 'letterhead_url', '' );
+        $title          = esc_html( $tpl['name'] ?? 'Document' );
+
+        // Output a print-ready HTML page
+        header( 'Content-Type: text/html; charset=utf-8' );
+        ?>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title><?php echo $title; ?></title>
+<style>
+    @page { margin: 1in; size: letter; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Georgia', 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; color: #1a1a1a; padding: 0.5in; }
+    .letterhead { text-align: center; margin-bottom: 24pt; padding-bottom: 12pt; border-bottom: 2px solid #333; }
+    .letterhead img { max-width: 300px; max-height: 100px; }
+    .doc-content { white-space: pre-wrap; }
+    .doc-content p { margin-bottom: 12pt; }
+    @media print {
+        body { padding: 0; }
+        .no-print { display: none; }
+    }
+    .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #6366f1; color: #fff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; font-family: sans-serif; font-size: 14px; z-index: 9999; }
+    .print-bar button { background: #fff; color: #6366f1; border: none; padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .print-bar button:hover { background: #f1f5f9; }
+    @media print { .print-bar { display: none; } }
+    body { padding-top: 60px; }
+    @media print { body { padding-top: 0; } }
+</style>
+</head>
+<body>
+<div class="print-bar no-print">
+    <span><?php echo $title; ?></span>
+    <button onclick="window.print()">Print / Save as PDF</button>
+</div>
+<?php if ( $letterhead_url ) : ?>
+<div class="letterhead"><img src="<?php echo esc_url( $letterhead_url ); ?>" alt="Letterhead" /></div>
+<?php endif; ?>
+<div class="doc-content"><?php echo wp_kses_post( $content ); ?></div>
+</body>
+</html>
+        <?php
+        exit;
+    }
+
     public function admin_get_settings( $request ) {
         $settings = Michelle_AI_Settings::all();
         // Mask API keys
@@ -699,8 +791,8 @@ class Michelle_AI_Chat {
             if ( $key === 'audio_api_key' && $val === '••••••••' ) {
                 continue;
             }
-            // Array fields (e.g. extraction_properties)
-            if ( $key === 'extraction_properties' ) {
+            // Array fields
+            if ( in_array( $key, [ 'extraction_properties', 'document_templates' ], true ) ) {
                 $save[ $key ] = is_array( $val ) ? $val : [];
                 continue;
             }

@@ -69,7 +69,7 @@
                 data[key] = val;
             });
             // Explicitly handle unchecked checkboxes
-            ['chat_enabled','auto_reply','moderation_mode','notification_sound','extraction_enabled','audio_enabled'].forEach(k => {
+            ['widget_visible','chat_enabled','auto_reply','moderation_mode','notification_sound','extraction_enabled','audio_enabled'].forEach(k => {
                 if (!(k in data)) data[k] = false;
                 else data[k] = true;
             });
@@ -79,6 +79,9 @@
 
             // Collect extraction properties from dynamic rows
             data.extraction_properties = collectExtractionProps();
+
+            // Collect document templates
+            data.document_templates = collectDocumentTemplates();
 
             try {
                 await apiPost('/admin/settings', data);
@@ -315,6 +318,17 @@
     // -------------------------------------------------------------------------
     // Conversation status change
     // -------------------------------------------------------------------------
+    function initDocTemplateSelect() {
+        const tplSel = document.getElementById('mai-doc-template-select');
+        const pdfBtn = document.getElementById('mai-generate-pdf-btn');
+        if (!tplSel || !pdfBtn) return;
+        tplSel.addEventListener('change', () => {
+            const url = new URL(pdfBtn.href);
+            url.searchParams.set('template', tplSel.value);
+            pdfBtn.href = url.toString();
+        });
+    }
+
     function initStatusSelect() {
         const sel = document.getElementById('mai-status-select');
         if (!sel) return;
@@ -629,6 +643,109 @@
     }
 
     // -------------------------------------------------------------------------
+    // Document templates (CRUD + placeholder insertion)
+    // -------------------------------------------------------------------------
+    function collectDocumentTemplates() {
+        const cards = document.querySelectorAll('.mai-template-card');
+        const templates = [];
+        cards.forEach(card => {
+            const name    = card.querySelector('.mai-tpl-name')?.value.trim();
+            const content = card.querySelector('.mai-tpl-content')?.value || '';
+            if (name) {
+                templates.push({ name, content });
+            }
+        });
+        return templates;
+    }
+
+    function initTemplates() {
+        const list   = document.getElementById('mai-template-list');
+        const addBtn = document.getElementById('mai-add-template');
+        if (!list || !addBtn) return;
+
+        // Build placeholder buttons HTML from extraction properties
+        const props = collectExtractionProps();
+        function placeholderBtnsHtml() {
+            let html = '<span class="description">Insert:</span> ';
+            props.forEach(p => {
+                html += `<button type="button" class="button button-small mai-insert-placeholder" data-placeholder="{{${escHtml(p.key)}}}">${escHtml(p.label || p.key)}</button> `;
+            });
+            html += '<button type="button" class="button button-small mai-insert-placeholder" data-placeholder="{{date}}">Date</button>';
+            return html;
+        }
+
+        addBtn.addEventListener('click', () => {
+            // Remove empty state message
+            list.querySelector('.mai-empty-templates')?.remove();
+
+            const idx = list.querySelectorAll('.mai-template-card').length;
+            const card = document.createElement('div');
+            card.className = 'mai-template-card';
+            card.dataset.index = idx;
+            card.innerHTML =
+                '<div class="mai-template-header">' +
+                    '<input type="text" class="mai-tpl-name regular-text" placeholder="Template Name" />' +
+                    '<button type="button" class="button mai-tpl-toggle">Edit</button>' +
+                    '<button type="button" class="button mai-tpl-remove" style="color:#d63638;">&times;</button>' +
+                '</div>' +
+                '<div class="mai-template-body">' +
+                    '<div class="mai-placeholder-btns">' + placeholderBtnsHtml() + '</div>' +
+                    '<textarea class="mai-tpl-content large-text" rows="12" placeholder="Template content with {{placeholders}}..."></textarea>' +
+                '</div>';
+            list.appendChild(card);
+        });
+
+        // Toggle body visibility
+        list.addEventListener('click', (e) => {
+            if (e.target.matches('.mai-tpl-toggle')) {
+                const body = e.target.closest('.mai-template-card').querySelector('.mai-template-body');
+                if (body) {
+                    body.hidden = !body.hidden;
+                    e.target.textContent = body.hidden ? 'Edit' : 'Collapse';
+                }
+            }
+            if (e.target.matches('.mai-tpl-remove')) {
+                e.target.closest('.mai-template-card').remove();
+            }
+            // Insert placeholder at cursor position in nearest textarea
+            if (e.target.matches('.mai-insert-placeholder')) {
+                const card = e.target.closest('.mai-template-card');
+                const ta = card?.querySelector('.mai-tpl-content');
+                if (ta) {
+                    const placeholder = e.target.dataset.placeholder;
+                    const start = ta.selectionStart;
+                    const end   = ta.selectionEnd;
+                    ta.value = ta.value.substring(0, start) + placeholder + ta.value.substring(end);
+                    ta.selectionStart = ta.selectionEnd = start + placeholder.length;
+                    ta.focus();
+                }
+            }
+        });
+
+        // WordPress media uploader for letterhead
+        const uploadBtn = document.getElementById('mai-upload-letterhead');
+        if (uploadBtn) {
+            uploadBtn.addEventListener('click', () => {
+                if (!window.wp || !wp.media) {
+                    alert('Media uploader not available. Please enter the URL manually.');
+                    return;
+                }
+                const frame = wp.media({
+                    title: 'Select Letterhead Logo',
+                    button: { text: 'Use as Letterhead' },
+                    multiple: false,
+                    library: { type: 'image' },
+                });
+                frame.on('select', () => {
+                    const url = frame.state().get('selection').first().toJSON().url;
+                    document.getElementById('letterhead_url').value = url;
+                });
+                frame.open();
+            });
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Boot
     // -------------------------------------------------------------------------
     document.addEventListener('DOMContentLoaded', () => {
@@ -636,11 +753,13 @@
         initTemperature();
         initSettingsForm();
         initExtractionProps();
+        initTemplates();
         initMessageScroll();
         initReply();
         initSuggestedReply();
         initApprove();
         initStatusSelect();
+        initDocTemplateSelect();
         initAdminPolling();
     });
 

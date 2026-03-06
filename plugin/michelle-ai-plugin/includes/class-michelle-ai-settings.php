@@ -48,6 +48,10 @@ class Michelle_AI_Settings {
             'extraction_enabled'    => false,
             'extraction_properties' => [],
 
+            // Document templates
+            'document_templates'  => [],
+            'letterhead_url'      => '',
+
             // Contact form
             'form_title'          => 'Send us a message',
             'form_label_name'     => 'Your Name',

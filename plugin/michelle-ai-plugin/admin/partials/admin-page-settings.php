@@ -23,6 +23,7 @@ $audio_key_display = $s['audio_api_key'] ? '••••••••' : '';
         <a href="#ai"       class="mai-tab" data-tab="ai"><?php esc_html_e( 'AI', 'michelle-ai-plugin' ); ?></a>
         <a href="#audio"      class="mai-tab" data-tab="audio"><?php esc_html_e( 'Audio', 'michelle-ai-plugin' ); ?></a>
         <a href="#extraction" class="mai-tab" data-tab="extraction"><?php esc_html_e( 'Data Collection', 'michelle-ai-plugin' ); ?></a>
+        <a href="#templates" class="mai-tab" data-tab="templates"><?php esc_html_e( 'Templates', 'michelle-ai-plugin' ); ?></a>
         <a href="#contact"  class="mai-tab" data-tab="contact"><?php esc_html_e( 'Contact Form', 'michelle-ai-plugin' ); ?></a>
     </div>
 
@@ -254,6 +255,67 @@ $audio_key_display = $s['audio_api_key'] ? '••••••••' : '';
                 <?php endforeach; ?>
             </div>
             <p><button type="button" class="button" id="mai-add-prop"><?php esc_html_e( '+ Add Property', 'michelle-ai-plugin' ); ?></button></p>
+        </div>
+
+        <!-- ── Templates ─────────────────────────────────────────────────── -->
+        <div class="mai-tab-panel" id="mai-tab-templates" hidden>
+            <table class="form-table">
+                <tr>
+                    <th><label for="letterhead_url"><?php esc_html_e( 'Letterhead Logo', 'michelle-ai-plugin' ); ?></label></th>
+                    <td>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="url" id="letterhead_url" name="letterhead_url" value="<?php echo esc_attr( $s['letterhead_url'] ); ?>" class="large-text" placeholder="https://..." />
+                            <button type="button" class="button" id="mai-upload-letterhead"><?php esc_html_e( 'Upload', 'michelle-ai-plugin' ); ?></button>
+                        </div>
+                        <?php if ( $s['letterhead_url'] ) : ?>
+                            <p style="margin-top:8px;"><img src="<?php echo esc_url( $s['letterhead_url'] ); ?>" style="max-height:60px;" /></p>
+                        <?php endif; ?>
+                        <p class="description"><?php esc_html_e( 'Logo displayed at the top of generated documents.', 'michelle-ai-plugin' ); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <h3><?php esc_html_e( 'Document Templates', 'michelle-ai-plugin' ); ?></h3>
+            <p class="description" style="margin-bottom:8px;">
+                <?php esc_html_e( 'Create templates for screening documents. Use {{placeholder}} syntax to insert extracted data. Click placeholder buttons to insert at cursor position.', 'michelle-ai-plugin' ); ?>
+            </p>
+
+            <?php
+            $doc_templates = $s['document_templates'];
+            if ( ! is_array( $doc_templates ) ) { $doc_templates = []; }
+            $extraction_props = $s['extraction_properties'];
+            if ( ! is_array( $extraction_props ) ) { $extraction_props = []; }
+            ?>
+
+            <div id="mai-template-list">
+                <?php if ( empty( $doc_templates ) ) : ?>
+                    <p class="mai-empty-templates" style="color:#64748b;font-style:italic;"><?php esc_html_e( 'No templates yet. Click "Add Template" to create one.', 'michelle-ai-plugin' ); ?></p>
+                <?php endif; ?>
+                <?php foreach ( $doc_templates as $ti => $tpl ) : ?>
+                    <div class="mai-template-card" data-index="<?php echo (int) $ti; ?>">
+                        <div class="mai-template-header">
+                            <input type="text" class="mai-tpl-name regular-text" value="<?php echo esc_attr( $tpl['name'] ?? '' ); ?>" placeholder="<?php esc_attr_e( 'Template Name', 'michelle-ai-plugin' ); ?>" />
+                            <button type="button" class="button mai-tpl-toggle"><?php esc_html_e( 'Edit', 'michelle-ai-plugin' ); ?></button>
+                            <button type="button" class="button mai-tpl-remove" style="color:#d63638;">&times;</button>
+                        </div>
+                        <div class="mai-template-body" hidden>
+                            <div class="mai-placeholder-btns">
+                                <span class="description"><?php esc_html_e( 'Insert:', 'michelle-ai-plugin' ); ?></span>
+                                <?php foreach ( $extraction_props as $p ) : ?>
+                                    <button type="button" class="button button-small mai-insert-placeholder" data-placeholder="{{<?php echo esc_attr( $p['key'] ); ?>}}">
+                                        <?php echo esc_html( $p['label'] ?? $p['key'] ); ?>
+                                    </button>
+                                <?php endforeach; ?>
+                                <button type="button" class="button button-small mai-insert-placeholder" data-placeholder="{{date}}">Date</button>
+                            </div>
+                            <textarea class="mai-tpl-content large-text" rows="12" placeholder="<?php esc_attr_e( 'Template content with {{placeholders}}...', 'michelle-ai-plugin' ); ?>"><?php echo esc_textarea( $tpl['content'] ?? '' ); ?></textarea>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <p style="margin-top:12px;">
+                <button type="button" class="button" id="mai-add-template"><?php esc_html_e( '+ Add Template', 'michelle-ai-plugin' ); ?></button>
+            </p>
         </div>
 
         <!-- ── Contact Form ─────────────────────────────────────────────── -->

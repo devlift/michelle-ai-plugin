@@ -25,6 +25,10 @@ class Michelle_AI_Admin {
         if ( strpos( $hook, 'michelle-ai' ) === false ) {
             return;
         }
+        // Enqueue WP media uploader for letterhead image upload
+        if ( strpos( $hook, 'michelle-ai-settings' ) !== false ) {
+            wp_enqueue_media();
+        }
         wp_enqueue_script(
             'michelle-ai-admin',
             MICHELLE_AI_PLUGIN_URL . 'assets/js/admin.js',

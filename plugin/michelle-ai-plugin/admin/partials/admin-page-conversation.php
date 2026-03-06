@@ -38,6 +38,20 @@ if ( is_array( $props ) ) {
         <span><?php echo esc_html( $email ); ?></span>
     </div>
     <div class="mai-detail-actions">
+        <?php
+        $doc_templates = Michelle_AI_Settings::get( 'document_templates', [] );
+        if ( ! empty( $doc_templates ) && is_array( $doc_templates ) ) : ?>
+            <select id="mai-doc-template-select">
+                <?php foreach ( $doc_templates as $ti => $tpl ) : ?>
+                    <option value="<?php echo (int) $ti; ?>"><?php echo esc_html( $tpl['name'] ?? 'Template ' . ( $ti + 1 ) ); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <a id="mai-generate-pdf-btn" class="button"
+               href="<?php echo esc_url( rest_url( 'michelle-ai/v1/admin/conversations/' . (int) $conv_id . '/generate-pdf' ) . '?template=0&_wpnonce=' . wp_create_nonce( 'wp_rest' ) ); ?>"
+               target="_blank">
+                <?php esc_html_e( 'Generate PDF', 'michelle-ai-plugin' ); ?>
+            </a>
+        <?php endif; ?>
         <select id="mai-status-select" data-conv-id="<?php echo (int) $conv_id; ?>">
             <option value="active"   <?php selected( $conv->status, 'active' ); ?>><?php esc_html_e( 'Active', 'michelle-ai-plugin' ); ?></option>
             <option value="closed"   <?php selected( $conv->status, 'closed' ); ?>><?php esc_html_e( 'Closed', 'michelle-ai-plugin' ); ?></option>

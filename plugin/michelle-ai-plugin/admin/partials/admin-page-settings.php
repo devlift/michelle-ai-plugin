@@ -78,6 +78,16 @@ $audio_key_display = $s['audio_api_key'] ? '••••••••' : '';
         <div class="mai-tab-panel" id="mai-tab-chat" hidden>
             <table class="form-table">
                 <tr>
+                    <th><?php esc_html_e( 'Widget Visible', 'michelle-ai-plugin' ); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="widget_visible" value="1" <?php checked( $s['widget_visible'] ); ?> />
+                            <?php esc_html_e( 'Show widget on the site', 'michelle-ai-plugin' ); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e( 'Master switch — when off, nothing is shown to visitors (no chat, no contact form).', 'michelle-ai-plugin' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
                     <th><?php esc_html_e( 'Chat Status', 'michelle-ai-plugin' ); ?></th>
                     <td>
                         <label>

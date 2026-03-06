@@ -409,17 +409,30 @@
                     // New conversation — notify
                     fireAdminNotification('New conversation', conv.visitor_name || 'Anonymous');
                     location.reload();   // simple refresh to update list
-                } else if (conv.unread_admin) {
-                    existingLink.classList.add('mai-conv-unread');
-                    const badge = existingLink.querySelector('.mai-unread-badge');
-                    if (!badge) {
-                        const nameEl = existingLink.querySelector('.mai-conv-name');
-                        if (nameEl) {
-                            const dot = document.createElement('span');
-                            dot.className = 'mai-unread-badge';
-                            nameEl.appendChild(dot);
-                            // Notify
-                            fireAdminNotification('New message', conv.visitor_name || 'Anonymous');
+                } else {
+                    // Update name if it changed (e.g. extraction found visitor's name)
+                    const nameEl = existingLink.querySelector('.mai-conv-name');
+                    if (nameEl) {
+                        const displayName = conv.visitor_name || 'Anonymous';
+                        const badge = nameEl.querySelector('.mai-unread-badge');
+                        const currentName = nameEl.textContent.trim();
+                        if (currentName !== displayName) {
+                            nameEl.textContent = displayName;
+                            if (badge) nameEl.appendChild(badge);
+                        }
+                    }
+
+                    if (conv.unread_admin) {
+                        existingLink.classList.add('mai-conv-unread');
+                        const badge = existingLink.querySelector('.mai-unread-badge');
+                        if (!badge) {
+                            const nameEl2 = existingLink.querySelector('.mai-conv-name');
+                            if (nameEl2) {
+                                const dot = document.createElement('span');
+                                dot.className = 'mai-unread-badge';
+                                nameEl2.appendChild(dot);
+                                fireAdminNotification('New message', conv.visitor_name || 'Anonymous');
+                            }
                         }
                     }
                 }
@@ -475,9 +488,26 @@
                     autoGenerateSuggestion(convId);
                 }
 
-                // Refresh extracted data panel
-                if (hasNew && res.extracted_data) {
+                // Always refresh extracted data (extraction may complete between polls)
+                if (res.extracted_data) {
                     updateExtractedData(res.extracted_data);
+                }
+
+                // Update visitor name in header and sidebar if it changed
+                if (res.conversation && res.conversation.visitor_name) {
+                    const newName = res.conversation.visitor_name;
+                    const headerName = document.querySelector('.mai-detail-visitor strong');
+                    if (headerName && headerName.textContent !== newName) {
+                        headerName.textContent = newName;
+                        // Also update sidebar
+                        const sidebarItem = document.querySelector(`.mai-conv-item[data-id="${convId}"] .mai-conv-name`);
+                        if (sidebarItem) {
+                            // Preserve unread badge if present
+                            const badge = sidebarItem.querySelector('.mai-unread-badge');
+                            sidebarItem.textContent = newName;
+                            if (badge) sidebarItem.appendChild(badge);
+                        }
+                    }
                 }
             } catch (e) {
                 // silent

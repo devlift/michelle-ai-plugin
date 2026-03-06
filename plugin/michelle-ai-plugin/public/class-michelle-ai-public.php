@@ -10,6 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Michelle_AI_Public {
 
     public function enqueue_styles() {
+        if ( ! (bool) Michelle_AI_Settings::get( 'widget_visible', true ) ) return;
         wp_enqueue_style(
             'michelle-ai-public',
             MICHELLE_AI_PLUGIN_URL . 'assets/css/public.css',
@@ -19,6 +20,7 @@ class Michelle_AI_Public {
     }
 
     public function enqueue_scripts() {
+        if ( ! (bool) Michelle_AI_Settings::get( 'widget_visible', true ) ) return;
         wp_enqueue_script(
             'michelle-ai-public',
             MICHELLE_AI_PLUGIN_URL . 'assets/js/public.js',
@@ -41,6 +43,8 @@ class Michelle_AI_Public {
     }
 
     public function render_widget() {
+        if ( ! (bool) Michelle_AI_Settings::get( 'widget_visible', true ) ) return;
+
         $chat_enabled = (bool) Michelle_AI_Settings::get( 'chat_enabled', true );
 
         if ( $chat_enabled ) {

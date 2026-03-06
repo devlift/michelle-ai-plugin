@@ -26,6 +26,7 @@ class Michelle_AI_Settings {
             'fab_icon'         => 'bubble', // bubble | dots | message
 
             // Chat
+            'widget_visible'   => true,
             'chat_enabled'     => true,
             'auto_reply'       => true,
             'moderation_mode'  => false,

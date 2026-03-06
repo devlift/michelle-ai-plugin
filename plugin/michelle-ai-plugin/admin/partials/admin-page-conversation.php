@@ -130,19 +130,21 @@ if ( is_array( $props ) ) {
     <?php endforeach; ?>
 </div>
 
-<!-- AI suggested reply -->
-<div class="mai-suggestion-box">
-    <div class="mai-suggestion-header">
-        <span><?php esc_html_e( 'AI Suggested Reply', 'michelle-ai-plugin' ); ?></span>
+<!-- AI suggested reply (collapsed by default) -->
+<div class="mai-suggestion-box mai-suggestion-collapsed">
+    <div class="mai-suggestion-header" id="mai-suggestion-toggle">
+        <span>▸ <?php esc_html_e( 'AI Suggested Reply', 'michelle-ai-plugin' ); ?></span>
         <button id="mai-regenerate-btn" class="button-link" data-conv-id="<?php echo (int) $conv_id; ?>">
             ↻ <?php esc_html_e( 'Regenerate', 'michelle-ai-plugin' ); ?>
         </button>
     </div>
-    <textarea id="mai-suggestion-text" class="mai-suggestion-textarea" rows="3" placeholder="<?php esc_attr_e( 'Click Regenerate to get an AI suggestion…', 'michelle-ai-plugin' ); ?>"></textarea>
-    <div class="mai-suggestion-btns">
-        <button id="mai-use-suggestion-btn" class="button button-primary" data-conv-id="<?php echo (int) $conv_id; ?>">
-            <?php esc_html_e( 'Send This Reply', 'michelle-ai-plugin' ); ?>
-        </button>
+    <div class="mai-suggestion-body">
+        <textarea id="mai-suggestion-text" class="mai-suggestion-textarea" rows="3" placeholder="<?php esc_attr_e( 'Click Regenerate to get an AI suggestion…', 'michelle-ai-plugin' ); ?>"></textarea>
+        <div class="mai-suggestion-btns">
+            <button id="mai-use-suggestion-btn" class="button button-primary" data-conv-id="<?php echo (int) $conv_id; ?>">
+                <?php esc_html_e( 'Send This Reply', 'michelle-ai-plugin' ); ?>
+            </button>
+        </div>
     </div>
 </div>
 

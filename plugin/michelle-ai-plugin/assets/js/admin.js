@@ -259,11 +259,34 @@
         const regenBtn = document.getElementById('mai-regenerate-btn');
         const useBtn   = document.getElementById('mai-use-suggestion-btn');
         const textarea = document.getElementById('mai-suggestion-text');
+        const box      = document.querySelector('.mai-suggestion-box');
+        const toggle   = document.getElementById('mai-suggestion-toggle');
         if (!regenBtn || !useBtn || !textarea) return;
 
         const convId = parseInt(regenBtn.dataset.convId, 10);
 
-        regenBtn.addEventListener('click', async () => {
+        // Toggle collapse/expand
+        if (toggle && box) {
+            toggle.addEventListener('click', (e) => {
+                // Don't toggle if they clicked the Regenerate button
+                if (e.target.closest('#mai-regenerate-btn')) return;
+                box.classList.toggle('mai-suggestion-collapsed');
+                const label = toggle.querySelector('span');
+                if (label) {
+                    const isCollapsed = box.classList.contains('mai-suggestion-collapsed');
+                    label.textContent = (isCollapsed ? '▸ ' : '▾ ') + 'AI Suggested Reply';
+                }
+            });
+        }
+
+        regenBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            // Auto-expand when generating
+            if (box) {
+                box.classList.remove('mai-suggestion-collapsed');
+                const label = toggle?.querySelector('span');
+                if (label) label.textContent = '▾ AI Suggested Reply';
+            }
             regenBtn.textContent = '↻ Loading…';
             regenBtn.disabled = true;
             try {
@@ -354,6 +377,16 @@
         try {
             const res = await apiPost(`/admin/conversations/${convId}/suggest`, {});
             textarea.value = res.suggestion || '';
+            // Auto-expand the suggestion box when a suggestion arrives
+            if (res.suggestion) {
+                const box = document.querySelector('.mai-suggestion-box');
+                const toggle = document.getElementById('mai-suggestion-toggle');
+                if (box) {
+                    box.classList.remove('mai-suggestion-collapsed');
+                    const label = toggle?.querySelector('span');
+                    if (label) label.textContent = '▾ AI Suggested Reply';
+                }
+            }
         } catch(e) {
             // silent — admin can still click Regenerate manually
         }

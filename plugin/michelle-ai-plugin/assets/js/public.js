@@ -1,6 +1,9 @@
 /**
  * Michelle AI — Public Chat Widget
  * Vanilla JS, no dependencies.
+ *
+ * Calls Supabase Edge Functions directly (no WordPress proxy).
+ * Config injected via wp_localize_script as window.michelleAICfg.
  */
 (function () {
     'use strict';
@@ -9,7 +12,8 @@
     // Config injected by wp_localize_script (michelleAICfg)
     // -------------------------------------------------------------------------
     const cfg = window.michelleAICfg || {};
-    const API = cfg.restUrl || '';   // e.g. https://site.com/wp-json/michelle-ai/v1
+    const SUPABASE_URL = cfg.supabaseUrl || '';  // e.g. http://127.0.0.1:54421
+    const FUNCTIONS_URL = SUPABASE_URL + '/functions/v1';
     const chatEnabled = !!cfg.chatEnabled;
 
     // -------------------------------------------------------------------------
@@ -185,12 +189,11 @@
 
     /**
      * Resume an existing session: validate the token by loading latest messages.
-     * If the token is expired (403), start a fresh conversation instead.
+     * If the token is expired (401/403), start a fresh conversation instead.
      */
     async function resumeSession() {
         try {
-            // Load latest 30 messages (paginated)
-            const url = `${API}/conversations/${state.conversationId}/messages?token=${encodeURIComponent(state.token)}&limit=30`;
+            const url = `${FUNCTIONS_URL}/messages?conversation_id=${state.conversationId}&limit=30`;
             const resp = await apiFetch(url, 'GET');
             // Support both old format (array) and new (paginated object)
             const msgs = Array.isArray(resp) ? resp : (resp.messages || []);
@@ -226,7 +229,7 @@
     // -------------------------------------------------------------------------
     async function startConversation() {
         try {
-            const res = await apiFetch('/conversations', 'POST', {});
+            const res = await apiFetch(`${FUNCTIONS_URL}/conversations`, 'POST', {});
             state.conversationId = res.conversation_id;
             state.token          = res.token;
             saveSession();
@@ -356,9 +359,12 @@
         inputEl.style.height = 'auto';
         sendBtn.disabled = true;
 
-        // POST to REST
+        // POST to Edge Function
         try {
-            await apiFetch(`/conversations/${state.conversationId}/messages`, 'POST', { content: text });
+            await apiFetch(`${FUNCTIONS_URL}/messages`, 'POST', {
+                content: text,
+                conversation_id: state.conversationId,
+            });
         } catch(e) {
             appendSystemMsg('Failed to send message.');
             sendBtn.disabled = false;
@@ -367,100 +373,123 @@
         }
 
         // Only show typing and open SSE stream if AI auto-reply is enabled
-        // Note: wp_localize_script converts false to "" so we check truthiness
         if (cfg.autoReply) {
             typingEl.hidden = false;
             scrollToBottom();
             openStream();
         } else {
             sendBtn.disabled = false;
-            // Don't update lastPollTime with client time — the server stores
-            // timestamps in WP local timezone which may differ from browser UTC.
-            // Keep the existing server-derived lastPollTime; dedup handles duplicates.
             startPolling();
         }
     }
 
     // -------------------------------------------------------------------------
-    // SSE stream (AI response)
+    // SSE stream (AI response) — fetch-based for POST support
     // -------------------------------------------------------------------------
-    function openStream() {
+    async function openStream() {
         state.streaming = true;
         stopPolling();     // pause polling while streaming
 
-        const url = new URL(`${API}/conversations/${state.conversationId}/stream`);
-        url.searchParams.set('token', state.token);
-
-        const es = new EventSource(url.toString());
         let bubble = null;
         let fullText = '';
 
-        es.onmessage = (e) => {
-            // Handle both legacy "[DONE]" and new JSON done payload
-            let data;
-            if (e.data === '[DONE]') {
-                data = { done: true };
-            } else {
-                data = JSON.parse(e.data);
+        try {
+            const res = await fetch(`${FUNCTIONS_URL}/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Chat-Token': state.token || '',
+                },
+                body: JSON.stringify({
+                    conversation_id: state.conversationId,
+                }),
+            });
+
+            if (!res.ok) {
+                throw new Error('Stream request failed');
             }
 
-            if (data.done) {
-                es.close();
-                typingEl.hidden = true;
-                state.streaming = false;
-                sendBtn.disabled = false;
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-                // Tag the streaming bubble with the server message ID for dedup
-                if (bubble) {
-                    const wrap = document.getElementById('mai-streaming-bubble');
-                    if (wrap) {
-                        if (data.msg_id) wrap.dataset.id = data.msg_id;
-                        wrap.removeAttribute('id');
-                        const content = wrap.querySelector('.mai-msg-content');
-                        if (content) {
-                            const meta = document.createElement('div');
-                            meta.className = 'mai-msg-meta';
-                            meta.textContent = (cfg.agentName || 'Support') + ' \u00B7 ' + formatTime(null);
-                            content.appendChild(meta);
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                // Parse SSE lines from the buffer
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // keep incomplete line in buffer
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const payload = line.slice(6);
+
+                    let data;
+                    if (payload === '[DONE]') {
+                        data = { done: true };
+                    } else {
+                        try { data = JSON.parse(payload); }
+                        catch { continue; }
+                    }
+
+                    if (data.done) {
+                        typingEl.hidden = true;
+                        state.streaming = false;
+                        sendBtn.disabled = false;
+
+                        // Tag the streaming bubble with the server message ID for dedup
+                        if (bubble) {
+                            const wrap = document.getElementById('mai-streaming-bubble');
+                            if (wrap) {
+                                if (data.msg_id) wrap.dataset.id = data.msg_id;
+                                wrap.removeAttribute('id');
+                                const content = wrap.querySelector('.mai-msg-content');
+                                if (content) {
+                                    const meta = document.createElement('div');
+                                    meta.className = 'mai-msg-meta';
+                                    meta.textContent = (cfg.agentName || 'Support') + ' \u00B7 ' + formatTime(null);
+                                    content.appendChild(meta);
+                                }
+                            }
+                        }
+                        // Don't break — there may be quick_replies after done
+                        continue;
+                    }
+
+                    if (data.token !== undefined) {
+                        if (!bubble) {
+                            typingEl.hidden = true;
+                            bubble = createStreamingBubble();
+                        }
+                        fullText += data.token;
+                        bubble.innerHTML = renderMd(fullText);
+                        scrollToBottom();
+                    }
+
+                    if (data.quick_replies && data.quick_replies.length) {
+                        const wrap = document.getElementById('mai-streaming-bubble') ||
+                                     (bubble && bubble.closest('.mai-message'));
+                        if (wrap) {
+                            const content = wrap.querySelector('.mai-msg-content');
+                            if (content && !content.querySelector('.mai-quick-replies')) {
+                                content.appendChild(renderQuickReplies(data.quick_replies));
+                            }
                         }
                     }
                 }
-
-                // Resume polling — keep existing server-derived lastPollTime
-                // so the next poll picks up any admin messages. Dedup prevents
-                // the saved AI message from appearing twice.
-                startPolling();
-                return;
             }
+        } catch (e) {
+            console.error('Stream error:', e);
+        }
 
-            if (data.token !== undefined) {
-                if (!bubble) {
-                    typingEl.hidden = true;
-                    bubble = createStreamingBubble();
-                }
-                fullText += data.token;
-                bubble.innerHTML = renderMd(fullText);
-                scrollToBottom();
-            }
-
-            if (data.quick_replies && data.quick_replies.length) {
-                const wrap = document.getElementById('mai-streaming-bubble');
-                if (wrap) {
-                    const content = wrap.querySelector('.mai-msg-content');
-                    if (content && !content.querySelector('.mai-quick-replies')) {
-                        content.appendChild(renderQuickReplies(data.quick_replies));
-                    }
-                }
-            }
-        };
-
-        es.onerror = () => {
-            es.close();
-            typingEl.hidden = true;
-            state.streaming = false;
-            sendBtn.disabled = false;
-            startPolling();
-        };
+        // Ensure we clean up state even if stream ended without a done event
+        typingEl.hidden = true;
+        state.streaming = false;
+        sendBtn.disabled = false;
+        startPolling();
     }
 
     // -------------------------------------------------------------------------
@@ -480,9 +509,11 @@
     async function fetchMessages(ts, all) {
         if (!state.conversationId) return;
         try {
-            const since = (all || !state.lastPollTime) ? '' : state.lastPollTime;
-            const url   = `${API}/conversations/${state.conversationId}/messages?token=${encodeURIComponent(state.token)}${since ? '&since=' + encodeURIComponent(since) : ''}`;
-            const resp  = await apiFetch(url, 'GET');
+            let url = `${FUNCTIONS_URL}/messages?conversation_id=${state.conversationId}`;
+            if (!all && state.lastPollTime) {
+                url += '&since=' + encodeURIComponent(state.lastPollTime);
+            }
+            const resp = await apiFetch(url, 'GET');
             // Support both array (polling/since) and paginated object
             const msgs  = Array.isArray(resp) ? resp : (resp.messages || resp || []);
             if (!msgs || !msgs.length) return;
@@ -570,7 +601,7 @@
             };
 
             try {
-                const res = await apiFetch('/contact', 'POST', data);
+                const res = await apiFetch(`${FUNCTIONS_URL}/contacts`, 'POST', data);
                 form.hidden = true;
                 successMsg.textContent = res.message || 'Thanks! We\'ll be in touch soon.';
                 successEl.hidden = false;
@@ -586,9 +617,7 @@
     // -------------------------------------------------------------------------
     // API helper
     // -------------------------------------------------------------------------
-    async function apiFetch(path, method, body) {
-        const isFullUrl = path.startsWith('http');
-        const url = isFullUrl ? path : (API + path);
+    async function apiFetch(url, method, body) {
         const opts = {
             method:  method || 'GET',
             headers: { 'Content-Type': 'application/json' },
@@ -600,7 +629,7 @@
         const json = await res.json();
 
         if (!res.ok) {
-            throw new Error(json.message || 'Request failed');
+            throw new Error(json.message || json.error || 'Request failed');
         }
         return json;
     }
@@ -622,7 +651,7 @@
         state.loadingOlder = true;
 
         try {
-            const url = `${API}/conversations/${state.conversationId}/messages?token=${encodeURIComponent(state.token)}&before=${state.oldestMsgId}&limit=20`;
+            const url = `${FUNCTIONS_URL}/messages?conversation_id=${state.conversationId}&before=${state.oldestMsgId}&limit=20`;
             const resp = await apiFetch(url, 'GET');
             const msgs = resp.messages || [];
 
@@ -746,8 +775,8 @@
             // Request mic permission upfront
             await navigator.mediaDevices.getUserMedia({ audio: true });
 
-            // Fetch signed URL from our backend
-            const res = await apiFetch('/audio/signed-url', 'GET');
+            // Fetch signed URL from Edge Function
+            const res = await apiFetch(`${FUNCTIONS_URL}/audio-signed-url`, 'GET');
 
             // Load SDK
             await loadElevenLabsSDK();
@@ -918,9 +947,13 @@
         if (!audioTranscripts.length || !state.conversationId) return;
         const messages = audioTranscripts.slice();
         audioTranscripts = [];
-        // Fire and forget — don't block UI
-        apiFetch(`/conversations/${state.conversationId}/audio-transcript`, 'POST', { messages })
-            .catch(err => console.warn('Failed to save audio transcripts:', err));
+        // Save each transcript as a message via Edge Function
+        Promise.all(messages.map(msg =>
+            apiFetch(`${FUNCTIONS_URL}/messages`, 'POST', {
+                content: msg.content,
+                conversation_id: state.conversationId,
+            }).catch(err => console.warn('Failed to save audio transcript:', err))
+        ));
     }
 
     function toggleMute() {
@@ -936,7 +969,7 @@
         }
     }
 
-    // ── Canvas waveform visualization ────────────────────────────────────
+    // -- Canvas waveform visualization ----------------------------------------
     function startWaveform() {
         const canvas = document.getElementById('mai-waveform');
         if (!canvas) return;

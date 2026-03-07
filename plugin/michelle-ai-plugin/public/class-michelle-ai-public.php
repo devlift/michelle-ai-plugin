@@ -32,7 +32,7 @@ class Michelle_AI_Public {
         $chat_enabled = (bool) Michelle_AI_Settings::get( 'chat_enabled', true );
 
         wp_localize_script( 'michelle-ai-public', 'michelleAICfg', [
-            'restUrl'     => esc_url_raw( rest_url( 'michelle-ai/v1' ) ),
+            'supabaseUrl' => defined( 'MICHELLE_AI_SUPABASE_PUBLIC_URL' ) ? MICHELLE_AI_SUPABASE_PUBLIC_URL : ( defined( 'MICHELLE_AI_SUPABASE_URL' ) ? MICHELLE_AI_SUPABASE_URL : '' ),
             'chatEnabled' => $chat_enabled,
             'autoReply'   => (bool) Michelle_AI_Settings::get( 'auto_reply', true ),
             'widgetTitle' => Michelle_AI_Settings::get( 'widget_title', 'Chat with us' ),

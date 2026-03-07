@@ -4,7 +4,7 @@
  */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-$conversations = Michelle_AI_DB::get_conversations( [ 'limit' => 100 ] );
+$conversations = Michelle_AI_Supabase::get_conversations( [ 'limit' => 100 ] );
 ?>
 <div class="wrap mai-admin">
     <h1 class="wp-heading-inline">

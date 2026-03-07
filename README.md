@@ -2,6 +2,8 @@
 
 A full-featured, real-time AI-powered live chat widget for WordPress. Visitors chat with you directly from your website via an animated floating action button. You manage all conversations from the WordPress admin dashboard. When chat is toggled off, the widget automatically becomes a contact form.
 
+**Data layer powered by Supabase** — all conversation data is stored in a HIPAA-compliant PostgreSQL database with column-level PII encryption, audit logging, and Row Level Security. The WordPress plugin acts as a thin admin UI; the chat widget communicates directly with Supabase Edge Functions.
+
 ---
 
 ## Features
@@ -9,8 +11,8 @@ A full-featured, real-time AI-powered live chat widget for WordPress. Visitors c
 | Feature | Details |
 |---|---|
 | **Live chat widget** | Animated FAB (lower-right), slide-up chat window, per-brand colors |
-| **Real-time messaging** | Long-polling (2 s) — no WebSocket server required |
-| **OpenAI integration** | Token streaming via SSE, configurable model & system prompt |
+| **Real-time messaging** | Supabase Realtime (WebSocket) with polling fallback |
+| **OpenAI integration** | Token streaming via SSE through Edge Functions, configurable model & system prompt |
 | **Quick reply chips** | AI auto-generates 2–3 contextual reply buttons for visitors |
 | **AI suggested reply** | Admin sees a pre-generated reply they can send or override |
 | **Moderation mode** | Hold AI responses for admin review before the visitor sees them |
@@ -19,90 +21,408 @@ A full-featured, real-time AI-powered live chat widget for WordPress. Visitors c
 | **Conversation management** | Admin inbox with unread badges, status (active / closed / archived) |
 | **Contact form fallback** | When chat is OFF, widget shows a configurable contact form |
 | **Branding controls** | Colors, logo, agent name, welcome message — all configurable |
-| **Encrypted API key** | OpenAI key stored XOR-encrypted in the WordPress options table |
+| **HIPAA-compliant data** | Column-level PII encryption, audit logging, Canadian data residency |
+| **Document templates** | Generate PDFs from conversation data with handlebar placeholders |
 | **Zero build step** | Pure PHP + Vanilla JS — no npm, no bundler |
 
 ---
 
-## Requirements
+## Architecture
 
-- **WordPress** 5.6 or later
-- **PHP** 7.4 or later (PHP 8.x recommended)
-- **MySQL** 5.7 / MariaDB 10.3 or later
-- **cURL** enabled in PHP (for OpenAI streaming)
-- **Docker + Docker Compose** for local development
-- An **OpenAI API key** for AI features (optional — chat works without it)
+```
+┌─────────────────────┐     ┌──────────────────────────────┐
+│  Chat Widget (JS)   │────▶│  Supabase Edge Functions      │
+│  (visitor browser)  │◀────│  (Deno runtime)               │
+└─────────────────────┘     │                              │
+                            │  ┌─ chat (SSE streaming)     │
+┌─────────────────────┐     │  ├─ conversations (CRUD)     │
+│  WordPress Admin    │────▶│  ├─ messages (CRUD + approve)│
+│  (PHP thin client)  │◀────│  ├─ suggest (AI suggestion)  │
+└─────────────────────┘     │  ├─ widget-config (public)   │
+                            │  ├─ contacts (form submit)   │
+                            │  ├─ settings (admin CRUD)    │
+                            │  ├─ generate-pdf (templates) │
+                            │  ├─ export-csv (data export) │
+                            │  └─ audio-signed-url         │
+                            └──────────┬───────────────────┘
+                                       │
+                            ┌──────────▼───────────────────┐
+                            │  Supabase PostgreSQL          │
+                            │  (ca-central-1 — Canada)      │
+                            │                              │
+                            │  ✓ Column-level encryption   │
+                            │  ✓ Row Level Security        │
+                            │  ✓ Audit logging triggers    │
+                            │  ✓ Realtime subscriptions    │
+                            └──────────────────────────────┘
+```
+
+---
+
+## Prerequisites
+
+Before you begin, make sure you have the following installed:
+
+| Tool | Version | Install |
+|---|---|---|
+| **Docker Desktop** | 20+ | [docker.com/get-docker](https://docs.docker.com/get-docker/) |
+| **Supabase CLI** | 2.70+ | `brew install supabase/tap/supabase` |
+| **Git** | 2.30+ | `brew install git` |
+| **Make** | Any | Pre-installed on macOS/Linux |
+
+Verify your installations:
+
+```bash
+docker --version        # Docker version 28.x.x
+supabase --version      # 2.75.0
+git --version           # git version 2.x.x
+make --version          # GNU Make 3.x or 4.x
+```
 
 ---
 
 ## Local Development Setup
 
-### 1. Clone the repository
+### Step 1: Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/michelle-ai-plugin.git
+git clone https://github.com/devlift/michelle-ai-plugin.git
 cd michelle-ai-plugin
 ```
 
-### 2. Configure environment variables
+### Step 2: Configure environment variables
 
 ```bash
 cp .env.example .env
 ```
 
-The defaults work out of the box:
+Edit `.env` if you need to change ports. Defaults:
 
 ```dotenv
 DB_ROOT_PASSWORD=rootpassword
 DB_NAME=wordpress
 DB_USER=wordpress
 DB_PASSWORD=wordpress
-
-WP_PORT=8080   # WordPress → http://localhost:8080
-PMA_PORT=8081  # phpMyAdmin → http://localhost:8081
+WP_PORT=8080       # WordPress → http://localhost:8080
+PMA_PORT=8081      # phpMyAdmin → http://localhost:8081
 ```
 
-### 3. Start Docker
+### Step 3: Start WordPress (Docker)
 
 ```bash
 make up
 ```
 
-| Container | URL | Purpose |
+This starts WordPress + MySQL + phpMyAdmin. Visit http://localhost:8080, complete the WordPress installation wizard, then activate the plugin:
+
+```bash
+make install-wpcli    # One-time: install WP-CLI in the container
+make activate         # Activate the Michelle AI plugin
+```
+
+### Step 4: Start Supabase (local)
+
+```bash
+make supabase-start
+```
+
+This runs `supabase start` which:
+1. Spins up a local PostgreSQL database on port **54422**
+2. Starts the API gateway on port **54421**
+3. Starts Supabase Studio (visual DB admin) on port **54423**
+4. Starts Mailpit (email testing) on port **54424**
+5. Applies all database migrations automatically
+6. Seeds the database with test data
+
+> **Note:** These ports are intentionally offset from the Supabase defaults (54321-54324) to avoid conflicts if you have other Supabase projects running locally.
+
+**First time only — after `supabase start` completes:**
+
+The terminal will display authentication keys. You don't need to copy them — the Edge Functions read them from environment variables automatically.
+
+### Step 5: Start Edge Functions
+
+```bash
+make supabase-functions
+```
+
+This serves all Edge Functions locally at `http://127.0.0.1:54421/functions/v1/`. The functions hot-reload when you edit their source files.
+
+### Step 6: Set your OpenAI API key (optional)
+
+For AI features to work locally, store your API key in the local database:
+
+```bash
+make set-openai-key KEY="sk-your-key-here"
+```
+
+### Step 7: Verify everything is running
+
+```bash
+make status
+```
+
+You should see:
+
+| Service | URL | Status |
 |---|---|---|
-| `michelle_ai_wordpress` | http://localhost:8080 | WordPress + plugin (live-mounted) |
-| `michelle_ai_db` | — | MySQL 8.0 |
-| `michelle_ai_phpmyadmin` | http://localhost:8081 | Database browser |
+| WordPress | http://localhost:8080 | Running |
+| phpMyAdmin | http://localhost:8081 | Running |
+| Supabase API | http://127.0.0.1:54421 | Running |
+| Supabase Studio | http://127.0.0.1:54423 | Running |
+| Edge Functions | http://127.0.0.1:54421/functions/v1/ | Serving |
 
-### 4. Complete the WordPress installation wizard
-
-Visit **http://localhost:8080** and fill in the 5-step installer:
-
-1. Choose language → **Continue**
-2. Enter site title, admin username, strong password, and email
-3. Click **Install WordPress** → **Log In**
-
-### 5. Install WP-CLI (one-time)
+### Quick test
 
 ```bash
-make install-wpcli
+# Test the widget config endpoint
+curl http://127.0.0.1:54421/functions/v1/widget-config
+
+# Create a test conversation
+curl -X POST http://127.0.0.1:54421/functions/v1/conversations \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test User","email":"test@example.com"}'
 ```
 
-### 6. Activate the plugin
+---
+
+## Development Commands
+
+### WordPress
 
 ```bash
-make activate
+make up               # Start WordPress + MySQL + phpMyAdmin
+make down             # Stop WordPress containers
+make restart          # Restart WordPress containers
+make shell            # Open bash inside the WordPress container
+make db-shell         # Open MySQL shell
+make logs s=wordpress # Tail logs for a specific service
+make activate         # Activate the plugin via WP-CLI
+make deactivate       # Deactivate the plugin
+make debug-log        # Tail WordPress debug.log
+make clean            # ⚠️  Stop containers AND delete volumes (destroys data)
 ```
 
-Or via the WordPress admin: **Plugins → Michelle AI Plugin → Activate**.
+### Supabase
 
-On activation, three custom database tables are created:
+```bash
+make supabase-start       # Start local Supabase (DB + API + Studio)
+make supabase-stop        # Stop local Supabase
+make supabase-status      # Show Supabase status and ports
+make supabase-functions   # Serve Edge Functions locally (hot-reload)
+make supabase-reset       # Reset DB: re-apply all migrations + seed data
+make supabase-diff        # Show schema diff (local vs migrations)
+make supabase-new-migration NAME="description"  # Create a new migration file
+make supabase-studio      # Open Supabase Studio in browser
+make set-openai-key KEY="sk-..."  # Store OpenAI API key in local DB
+```
 
-| Table | Purpose |
+### Full stack
+
+```bash
+make dev              # Start everything (WordPress + Supabase + Edge Functions)
+make dev-down         # Stop everything
+make status           # Show status of all services
+```
+
+---
+
+## Database Schema
+
+All tables live in Supabase PostgreSQL (not WordPress MySQL).
+
+| Table | Purpose | PII Encrypted |
+|---|---|---|
+| `conversations` | Chat sessions with visitor info | name, email, IP |
+| `messages` | All messages (visitor / admin / AI) | content |
+| `extracted_data` | Structured data extracted from conversations | property values |
+| `contacts` | Contact form submissions | name, email, address, message |
+| `agent_settings` | Plugin configuration (key-value) | — |
+| `admin_users` | Maps Supabase auth to admin role | — |
+| `audit_log` | HIPAA audit trail of all data operations | — |
+
+### Migrations
+
+Migrations are in `supabase/migrations/` and run in order:
+
+| File | Purpose |
 |---|---|
-| `wp_michelle_ai_conversations` | Chat sessions with visitor info |
-| `wp_michelle_ai_messages` | All messages (visitor / admin / AI) |
-| `wp_michelle_ai_contacts` | Contact form submissions |
+| `20260306000001_core_tables.sql` | Core tables with encrypted PII columns |
+| `20260306000002_rls_policies.sql` | Row Level Security policies |
+| `20260306000003_audit_logging.sql` | HIPAA audit triggers on all PHI tables |
+| `20260306000004_pii_encryption.sql` | `encrypt_pii()` / `decrypt_pii()` functions |
+| `20260306000005_realtime.sql` | Enable Realtime on messages + conversations |
+| `20260306000006_vault_secrets.sql` | Secret storage and `get_secret()` / `set_secret()` |
+
+### Creating a new migration
+
+```bash
+make supabase-new-migration NAME="add_some_column"
+# Edit the generated file in supabase/migrations/
+make supabase-reset   # Apply it locally
+```
+
+---
+
+## Edge Functions
+
+All Edge Functions are in `supabase/functions/`. Each function has its own directory with an `index.ts` entry point. Shared utilities are in `supabase/functions/_shared/`.
+
+| Function | Auth | Description |
+|---|---|---|
+| `widget-config` | Public | Widget branding and configuration |
+| `conversations` | Token / Admin | Create (visitor) or list/update (admin) |
+| `messages` | Token / Admin | Get/send messages, approve moderation |
+| `chat` | Token | SSE streaming AI response |
+| `contacts` | Public (rate-limited) | Contact form submission |
+| `suggest` | Admin | Generate AI suggested reply |
+| `settings` | Admin | Read/write plugin settings |
+| `generate-pdf` | Admin | Document template → print-ready HTML |
+| `export-csv` | Admin | Export conversations as CSV |
+| `audio-signed-url` | Public (rate-limited) | ElevenLabs audio session URL |
+
+### Shared utilities (`_shared/`)
+
+| File | Purpose |
+|---|---|
+| `cors.ts` | CORS headers for cross-origin requests |
+| `supabase.ts` | Supabase client factory (service role) |
+| `auth.ts` | Visitor token + admin JWT validation |
+| `openai.ts` | OpenAI API client (streaming + blocking) |
+| `encryption.ts` | PII encrypt/decrypt wrappers |
+
+---
+
+## HIPAA Compliance
+
+The Supabase data layer implements the following HIPAA safeguards:
+
+| Control | Implementation |
+|---|---|
+| **Encryption at rest** | AES-256 (Supabase default) + column-level pgcrypto encryption for all PII |
+| **Encryption in transit** | TLS/SSL for all connections |
+| **Access control** | Row Level Security — visitors only see their own data |
+| **Audit logging** | Triggers on all PHI tables log every INSERT/UPDATE/DELETE |
+| **Data residency** | Supabase project hosted in `ca-central-1` (Canada) |
+| **Secret management** | API keys stored in `private.encryption_keys`, not in settings |
+| **Role separation** | Visitors (token auth) vs Admins (JWT + admin_users table) |
+
+### PII fields and encryption
+
+Every PII field has a corresponding `*_encrypted` bytea column. Edge Functions:
+1. **On write**: call `encrypt_pii()` and store in encrypted column; plaintext column is left empty
+2. **On read (admin)**: call `decrypt_pii()` to return real values
+3. **On read (visitor)**: only returns their own data from the plaintext column
+
+---
+
+## CI/CD Pipeline
+
+The project uses GitHub Actions for automated deployment. On push to `main`:
+
+### 1. Supabase deployment (migrations + Edge Functions)
+
+File: `.github/workflows/deploy-supabase.yml`
+
+- Links to the production Supabase project
+- Runs `supabase db push` to apply any new migrations
+- Runs `supabase functions deploy` to deploy all Edge Functions
+- Secrets stored securely in Supabase (not in environment variables)
+
+### 2. WordPress plugin deployment
+
+File: `.github/workflows/deploy.yml`
+
+- Rsyncs the plugin directory to SiteGround
+- Activates the plugin via WP-CLI
+- Purges SiteGround cache
+
+### Required GitHub Secrets
+
+For the CI/CD pipelines to work, the following secrets must be configured in the GitHub repository settings (**Settings → Secrets and variables → Actions**):
+
+#### Supabase deployment
+
+| Secret | Description | How to get it |
+|---|---|---|
+| `SUPABASE_ACCESS_TOKEN` | Supabase CLI personal access token | [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) |
+| `SUPABASE_PROJECT_ID` | Production project reference ID | Supabase dashboard → Project Settings → General |
+| `SUPABASE_DB_PASSWORD` | Production database password | Supabase dashboard → Project Settings → Database |
+
+#### SiteGround deployment (existing)
+
+| Secret | Description |
+|---|---|
+| `SG_SSH_KEY` | SSH private key for SiteGround |
+| `SG_SSH_HOST` | SiteGround SSH hostname |
+| `SG_SSH_USER` | SiteGround SSH username |
+| `SG_SSH_PORT` | SiteGround SSH port (usually 18765) |
+| `SG_DEPLOY_PATH` | Path to `wp-content/plugins/` on the server |
+
+---
+
+## Project Structure
+
+```
+michelle-ai-plugin/
+├── supabase/                          # Supabase project (data layer)
+│   ├── config.toml                    # Local dev config (custom ports)
+│   ├── seed.sql                       # Test data for local development
+│   ├── migrations/
+│   │   ├── 20260306000001_core_tables.sql
+│   │   ├── 20260306000002_rls_policies.sql
+│   │   ├── 20260306000003_audit_logging.sql
+│   │   ├── 20260306000004_pii_encryption.sql
+│   │   ├── 20260306000005_realtime.sql
+│   │   └── 20260306000006_vault_secrets.sql
+│   └── functions/
+│       ├── _shared/                   # Shared utilities
+│       │   ├── cors.ts
+│       │   ├── supabase.ts
+│       │   ├── auth.ts
+│       │   ├── openai.ts
+│       │   └── encryption.ts
+│       ├── chat/index.ts              # SSE streaming AI responses
+│       ├── conversations/index.ts     # Create/list/update conversations
+│       ├── messages/index.ts          # Get/send/approve messages
+│       ├── widget-config/index.ts     # Public widget configuration
+│       ├── contacts/index.ts          # Contact form submissions
+│       ├── suggest/index.ts           # AI suggested reply
+│       ├── settings/index.ts          # Plugin settings CRUD
+│       ├── generate-pdf/index.ts      # Document template rendering
+│       ├── export-csv/index.ts        # CSV data export
+│       └── audio-signed-url/index.ts  # ElevenLabs audio URL
+├── plugin/                            # WordPress plugin (thin client)
+│   └── michelle-ai-plugin/
+│       ├── michelle-ai-plugin.php     # Entry point
+│       ├── includes/
+│       │   ├── class-michelle-ai.php
+│       │   ├── class-michelle-ai-loader.php
+│       │   ├── class-michelle-ai-activator.php
+│       │   ├── class-michelle-ai-deactivator.php
+│       │   ├── class-michelle-ai-settings.php
+│       │   ├── class-michelle-ai-db.php
+│       │   ├── class-michelle-ai-chat.php
+│       │   └── class-michelle-ai-ai.php
+│       ├── admin/
+│       │   ├── class-michelle-ai-admin.php
+│       │   └── partials/
+│       ├── public/
+│       │   ├── class-michelle-ai-public.php
+│       │   └── partials/
+│       └── assets/
+│           ├── css/
+│           └── js/
+├── .github/workflows/
+│   ├── deploy.yml                     # WordPress plugin → SiteGround
+│   └── deploy-supabase.yml           # Migrations + Edge Functions → Supabase
+├── config/
+│   └── apache-wordpress.conf
+├── docker-compose.yml
+├── .env.example
+├── Makefile
+└── README.md
+```
 
 ---
 
@@ -115,11 +435,11 @@ Navigate to **WordPress Admin → Michelle AI → Settings**.
 | Setting | Description |
 |---|---|
 | Widget Title | Text in the chat window header |
-| Agent Name | Sender name shown in replies (e.g. "Support", "Michelle") |
+| Agent Name | Sender name shown in replies |
 | Welcome Message | Auto-sent when a visitor first opens the chat |
 | Primary Color | FAB button, header bar, visitor message bubbles |
 | Secondary Color | AI / admin reply bubble background |
-| Logo / Avatar URL | URL to a square image (leave blank for letter avatar) |
+| Logo / Avatar URL | URL to a square image |
 
 ### Tab 2 — Chat
 
@@ -127,220 +447,90 @@ Navigate to **WordPress Admin → Michelle AI → Settings**.
 |---|---|
 | Chat Enabled | **ON** = live chat widget · **OFF** = contact form |
 | Auto Reply | AI automatically replies to each visitor message |
-| Moderation Mode | AI responses held for admin approval before delivery |
-| Notification Sound | Soft tone plays in admin when a new message arrives |
-
-**Mode matrix:**
-
-| Auto Reply | Moderation | Behaviour |
-|---|---|---|
-| ON | OFF | AI streams directly to visitor in real time |
-| ON | ON | AI writes reply → admin approves → visitor sees it |
-| OFF | — | AI suggestion shown only to admin; admin sends manually |
+| Moderation Mode | AI responses held for admin approval |
+| Notification Sound | Audio alert on new visitor message |
 
 ### Tab 3 — AI
 
 | Setting | Description |
 |---|---|
-| OpenAI API Key | Your `sk-...` key — stored encrypted, masked after first save |
-| Model | `gpt-4o-mini` (default), `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo` |
-| System Prompt | Instructions defining the AI's personality and scope |
-| Context Window | Number of recent messages included in the AI's context |
-| Temperature | 0 = deterministic · 1 = creative (0.7 recommended) |
+| OpenAI API Key | Your `sk-...` key — stored encrypted in Supabase |
+| Model | `gpt-4o-mini` (default), `gpt-4o`, etc. |
+| System Prompt | Instructions defining the AI's personality |
+| Context Window | Number of recent messages in AI context |
+| Temperature | 0 = deterministic · 1 = creative |
 
-**Example system prompt:**
-```
-You are a friendly support agent for Acme Corp. Help visitors with product questions, pricing, and troubleshooting. Keep replies concise (2–3 sentences). If you cannot help, offer to connect them with a human.
-```
-
-### Tab 4 — Contact Form
-
-Shown when **Chat Enabled** is OFF.
+### Tab 4 — Templates
 
 | Setting | Description |
 |---|---|
-| Form Title | Heading displayed in the widget |
-| Field Labels | Customise Name / Address / Email / Message labels |
-| Submit Button Label | Text on the submit button |
-| Success Message | Shown after a successful submission |
-| Notification Email | Where new submission emails are sent (defaults to WP admin email) |
+| Letterhead | Upload an image for document headers |
+| Document Templates | Create templates with `{{placeholder}}` variables |
 
-Submissions are saved to `wp_michelle_ai_contacts` **and** emailed to the notification address.
+### Tab 5 — Contact Form
 
----
-
-## Using the Admin Inbox
-
-Go to **WordPress Admin → Michelle AI → Conversations**.
-
-### Conversations list (left panel)
-- Sorted by most recent activity
-- **Bold + blue dot** = visitor has sent an unread message
-- Browser notification + sound fires when a new message arrives in any conversation
-
-### Conversation detail (right panel)
-- Full message thread between visitor and admin/AI
-- **Pending approval badge** — appears on AI messages when Moderation Mode is ON; click **✓ Approve & Send** to deliver
-- **AI Suggested Reply** box — click **↻ Regenerate** to get a fresh draft, edit it, then click **Send This Reply**
-- **Reply textarea** — type your own message and press **Send** or `Enter`
-- **Status dropdown** — set conversation to Active / Closed / Archived
-
----
-
-## Frontend Widget (Visitor View)
-
-1. **FAB button** appears in the bottom-right corner of every page
-2. **Pulse ring** around the FAB when there is an unread reply
-3. Click FAB → chat window **slides up** with a smooth animation
-4. Type a message, press `Enter` or click the send arrow
-5. **Typing indicator** (animated dots) while AI is thinking
-6. **AI reply streams in token by token** — no waiting for the full response
-7. **Quick reply chips** appear below AI messages — click one to instantly send
-8. **Browser notification** fires when a reply arrives while the window is out of focus
-
-The visitor's session token is stored in `localStorage` so conversations persist across page navigations within the same browser.
-
----
-
-## Development Commands
-
-```bash
-make up               # Start all Docker containers
-make down             # Stop all containers
-make restart          # Restart containers
-make shell            # Open bash inside the WordPress container
-make db-shell         # Open MySQL shell (user: wordpress, db: wordpress)
-make logs s=wordpress # Tail logs for a specific service
-make ps               # Show container status
-make install-wpcli    # Install WP-CLI (run once after first `make up`)
-make activate         # Activate the plugin via WP-CLI
-make deactivate       # Deactivate the plugin
-make wp cmd="..."     # Run any WP-CLI command inside the container
-make debug-log        # Tail WordPress debug.log in real time
-make clean            # ⚠️  Stop containers AND delete all volumes (destroys data)
-```
-
----
-
-## Project Structure
-
-```
-michelle-ai-plugin/
-├── plugin/
-│   └── michelle-ai-plugin/
-│       ├── michelle-ai-plugin.php            # Entry point & constants
-│       ├── includes/
-│       │   ├── class-michelle-ai.php         # Core — wires all hooks
-│       │   ├── class-michelle-ai-loader.php  # Action/filter registry
-│       │   ├── class-michelle-ai-activator.php   # DB table creation
-│       │   ├── class-michelle-ai-deactivator.php # Deactivation cleanup
-│       │   ├── class-michelle-ai-settings.php    # Settings get/save
-│       │   ├── class-michelle-ai-db.php          # Database CRUD
-│       │   ├── class-michelle-ai-chat.php         # REST API endpoints
-│       │   └── class-michelle-ai-ai.php           # OpenAI + SSE streaming
-│       ├── admin/
-│       │   ├── class-michelle-ai-admin.php        # Admin menus & assets
-│       │   └── partials/
-│       │       ├── admin-page-conversations.php   # Conversations list
-│       │       ├── admin-page-conversation.php    # Single conversation
-│       │       └── admin-page-settings.php        # Settings tabs
-│       ├── public/
-│       │   ├── class-michelle-ai-public.php       # Frontend assets & widget
-│       │   └── partials/
-│       │       ├── widget.php                     # Chat widget HTML
-│       │       └── contact-form.php               # Contact form HTML
-│       └── assets/
-│           ├── css/
-│           │   ├── admin.css    # Admin UI styles
-│           │   └── public.css   # Widget styles + animations
-│           └── js/
-│               ├── admin.js     # Admin: polling, reply, approve, notifications
-│               └── public.js    # Widget: FAB, SSE streaming, quick replies
-├── config/
-│   └── apache-wordpress.conf  # Apache AllowOverride fix (volume-mounted by Docker)
-├── docker-compose.yml         # WordPress + MySQL + phpMyAdmin
-├── .env                       # Local credentials (gitignored)
-├── .env.example               # Credentials template (safe to commit)
-├── Makefile                   # Dev shortcuts
-└── README.md                  # This file
-```
-
----
-
-## REST API Reference
-
-Base URL: `https://yoursite.com/wp-json/michelle-ai/v1`
-
-### Visitor endpoints (authenticate via `X-Chat-Token` header)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/conversations` | Start session. Returns `conversation_id` + `token`. |
-| `GET` | `/conversations/{id}/messages` | Poll messages. Add `?since=<datetime>` for incremental fetch. |
-| `POST` | `/conversations/{id}/messages` | Send a visitor message. |
-| `GET` | `/conversations/{id}/stream` | SSE — streams AI tokens in real time. |
-| `POST` | `/contact` | Submit contact form (chat=OFF mode). |
-| `GET` | `/widget-config` | Public branding/config (no auth). |
-
-### Admin endpoints (`X-WP-Nonce` header + `manage_options` capability)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/admin/conversations` | List all conversations with unread flag. |
-| `GET` | `/admin/conversations/{id}` | Get conversation + messages; clears unread flag. |
-| `POST` | `/admin/conversations/{id}/messages` | Admin sends a reply. |
-| `POST` | `/admin/conversations/{id}/suggest` | Generate an AI suggested reply. |
-| `PATCH` | `/admin/conversations/{id}` | Update status (active/closed/archived). |
-| `POST` | `/admin/messages/{id}/approve` | Approve a pending-moderation message. |
-| `GET` | `/admin/settings` | Get current settings (API key masked). |
-| `POST` | `/admin/settings` | Save settings. |
+Shown when **Chat Enabled** is OFF. Customizable labels, submit button text, success message, and notification email.
 
 ---
 
 ## Troubleshooting
 
+### Supabase won't start
+
+```bash
+# Check if Docker is running
+docker info
+
+# Check for port conflicts
+lsof -i :54421 -i :54422 -i :54423
+
+# Reset and try again
+make supabase-stop
+make supabase-start
+```
+
+### Edge Functions return "Missing authorization header"
+
+Make sure you're serving with `--no-verify-jwt`:
+
+```bash
+make supabase-functions   # This flag is included automatically
+```
+
 ### Widget renders but messages won't send
-WordPress REST API requires pretty permalinks.
-**Fix:** In the WordPress admin, go to **Settings → Permalinks**, choose any non-plain structure (e.g. "Post name"), and save. The `config/apache-wordpress.conf` Docker volume mount handles this automatically on container restart.
+
+1. Check that Edge Functions are running: `curl http://127.0.0.1:54421/functions/v1/widget-config`
+2. Check browser console for CORS errors
+3. Verify the WordPress plugin is configured to point at the correct Supabase URL
 
 ### AI replies aren't appearing
-1. Confirm your OpenAI API key is saved in **Michelle AI → Settings → AI**
-2. Ensure **Auto Reply** is ON
-3. Verify cURL is enabled: `docker exec michelle_ai_wordpress php -m | grep curl`
-4. Check the debug log: `make debug-log`
 
-### Contact form emails not arriving in production
-WordPress uses PHP `mail()` by default, which many hosts block. Install [WP Mail SMTP](https://wordpress.org/plugins/wp-mail-smtp/) and configure it to use Gmail, SendGrid, Mailgun, or any SMTP provider.
+1. Verify your OpenAI API key: `make set-openai-key KEY="sk-..."`
+2. Ensure **Auto Reply** is ON in settings
+3. Check Edge Function logs in the terminal where `make supabase-functions` is running
 
 ### Fresh start / reset everything
+
 ```bash
-make clean   # deletes all Docker volumes — all WordPress data is lost
-make up      # rebuild from scratch
+make dev-down         # Stop all services
+make clean            # Delete WordPress volumes
+make supabase-reset   # Reset Supabase DB
+make dev              # Start everything fresh
 ```
-Re-run the WordPress installer at http://localhost:8080.
 
 ---
 
 ## Security Notes
 
-- OpenAI API key is XOR-encrypted using WordPress's `AUTH_KEY` constant
-- All visitor REST endpoints validate session tokens stored as transients (24 h TTL)
-- Admin endpoints require `manage_options` capability + REST nonce
-- All user input is sanitized via `sanitize_text_field()` / `sanitize_textarea_field()`
-- Contact form includes IP-based rate limiting (5 submissions per IP per hour)
-- Run WordPress behind HTTPS in production — `window.Notification` requires a secure context
-
----
-
-## Production Deployment
-
-1. Copy `plugin/michelle-ai-plugin/` to your server's `wp-content/plugins/`
-2. Activate: **Plugins → Activate** (or `wp plugin activate michelle-ai-plugin`)
-3. Ensure your web server supports WordPress pretty permalinks:
-   - **Apache**: `AllowOverride All` in your VirtualHost (WordPress `.htaccess` handles the rest)
-   - **Nginx**: Add `try_files $uri $uri/ /index.php?$args;` inside your `location /` block
-4. Configure settings under **Michelle AI → Settings**
-5. Set up HTTPS — required for browser notifications in production
+- All PII is encrypted at the column level using AES-256 (pgcrypto)
+- Encryption key stored in `private` schema, inaccessible via PostgREST API
+- Row Level Security enforced on all tables
+- Visitor auth via session tokens validated against the database
+- Admin auth via Supabase JWT + `admin_users` table lookup
+- Audit triggers log every INSERT/UPDATE/DELETE on PHI tables
+- API keys stored in private schema, never exposed in settings responses
+- Contact form includes IP-based rate limiting
+- Edge Functions handle their own auth (gateway JWT verification disabled)
 
 ---
 

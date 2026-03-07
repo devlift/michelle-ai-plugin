@@ -5,19 +5,19 @@
  */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-$conv = Michelle_AI_DB::get_conversation( $conv_id );
+$conv = Michelle_AI_Supabase::get_conversation( $conv_id );
 if ( ! $conv ) {
     echo '<div class="mai-empty"><p>' . esc_html__( 'Conversation not found.', 'michelle-ai-plugin' ) . '</p></div>';
     return;
 }
 
-Michelle_AI_DB::mark_read( $conv_id );
+Michelle_AI_Supabase::mark_read( $conv_id );
 $page_size      = 30;
-$messages       = Michelle_AI_DB::get_messages_page( $conv_id, $page_size );
-$total_msgs     = Michelle_AI_DB::count_messages( $conv_id );
+$messages       = Michelle_AI_Supabase::get_messages_page( $conv_id, $page_size );
+$total_msgs     = Michelle_AI_Supabase::count_messages( $conv_id );
 $has_older      = $total_msgs > count( $messages );
 $mod_mode       = Michelle_AI_Settings::get( 'moderation_mode', false );
-$extracted_data = Michelle_AI_DB::get_extracted_data( $conv_id );
+$extracted_data = Michelle_AI_Supabase::get_extracted_data_for_conv( $conv_id );
 
 $name  = $conv->visitor_name  ?: __( 'Anonymous', 'michelle-ai-plugin' );
 $email = $conv->visitor_email ?: __( 'No email', 'michelle-ai-plugin' );
@@ -91,7 +91,8 @@ if ( is_array( $props ) ) {
         $bubble_cls = 'mai-admin-bubble mai-bubble-' . esc_attr( $msg->sender_type );
         if ( $is_pending ) $bubble_cls .= ' mai-bubble-pending';
 
-        $quick_replies = $msg->quick_replies ? json_decode( $msg->quick_replies, true ) : [];
+        $qr_raw = $msg->quick_replies ?? null;
+        $quick_replies = is_string( $qr_raw ) ? json_decode( $qr_raw, true ) : ( is_array( $qr_raw ) ? $qr_raw : [] );
         $suggestion    = $msg->ai_suggestion ?? '';
     ?>
         <div class="<?php echo esc_attr( $bubble_cls ); ?>" data-msg-id="<?php echo (int) $msg->id; ?>">

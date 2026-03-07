@@ -374,16 +374,6 @@
         try {
             const res = await apiPost(`/admin/conversations/${convId}/suggest`, {});
             textarea.value = res.suggestion || '';
-            // Auto-expand the suggestion box when a suggestion arrives
-            if (res.suggestion) {
-                const box = document.querySelector('.mai-suggestion-box');
-                const toggle = document.getElementById('mai-suggestion-toggle');
-                if (box) {
-                    box.classList.remove('mai-suggestion-collapsed');
-                    const label = toggle?.querySelector('span');
-                    if (label) label.textContent = '▾ AI Suggested Reply';
-                }
-            }
         } catch(e) {
             // silent — admin can still click Regenerate manually
         }
@@ -438,6 +428,19 @@
                 lastKnownConvs.add(parseInt(el.dataset.id, 10));
             });
             adminPollTimer = setInterval(pollConversations, 3000);
+
+            // Show loading spinner in detail pane when switching conversations
+            document.querySelector('.mai-conv-list').addEventListener('click', (e) => {
+                const item = e.target.closest('.mai-conv-item');
+                if (!item) return;
+                const detail = document.getElementById('mai-conv-detail');
+                if (detail) {
+                    detail.innerHTML = '<div class="mai-detail-loading"><span class="mai-spinner"></span> Loading conversation\u2026</div>';
+                }
+                // Mark active
+                document.querySelectorAll('.mai-conv-item').forEach(el => el.classList.remove('mai-conv-active'));
+                item.classList.add('mai-conv-active');
+            });
         }
 
         // Poll for new messages when viewing a conversation detail
@@ -447,6 +450,8 @@
     async function pollConversations() {
         try {
             const convs = await apiGet('/admin/conversations');
+            const listEl = document.querySelector('.mai-conv-list');
+
             convs.forEach(conv => {
                 const existingLink = document.querySelector(`.mai-conv-item[data-id="${conv.id}"]`);
                 if (!existingLink) {
@@ -466,6 +471,13 @@
                         }
                     }
 
+                    // Update timestamp display
+                    const tsEl = existingLink.querySelector('.mai-conv-ts');
+                    if (tsEl && conv.last_message_at) {
+                        const ago = timeAgo(conv.last_message_at);
+                        if (tsEl.textContent.trim() !== ago) tsEl.textContent = ago;
+                    }
+
                     if (conv.unread_admin) {
                         existingLink.classList.add('mai-conv-unread');
                         const badge = existingLink.querySelector('.mai-unread-badge');
@@ -482,9 +494,25 @@
                 }
                 lastKnownConvs.add(conv.id);
             });
+
+            // Re-order conversation list to match API sort order (newest first)
+            if (listEl) {
+                convs.forEach(conv => {
+                    const el = listEl.querySelector(`.mai-conv-item[data-id="${conv.id}"]`);
+                    if (el) listEl.appendChild(el);
+                });
+            }
         } catch(e) {
             // silent
         }
+    }
+
+    function timeAgo(dateStr) {
+        const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return Math.floor(diff / 60) + ' mins ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
+        return Math.floor(diff / 86400) + ' days ago';
     }
 
     // -------------------------------------------------------------------------
@@ -776,6 +804,173 @@
     }
 
     // -------------------------------------------------------------------------
+    // Retrain system prompt from conversations
+    // -------------------------------------------------------------------------
+    function initRetrain() {
+        const btn = document.getElementById('mai-retrain-btn');
+        const modal = document.getElementById('mai-retrain-modal');
+        if (!btn || !modal) return;
+
+        const closeBtn    = document.getElementById('mai-retrain-close');
+        const cancelBtn   = document.getElementById('mai-retrain-cancel');
+        const generateBtn = document.getElementById('mai-retrain-generate');
+        const selectAll   = document.getElementById('mai-retrain-select-all');
+        const countEl     = document.getElementById('mai-retrain-selected-count');
+        const listEl      = document.getElementById('mai-retrain-conv-list');
+        let conversations = [];
+
+        function openModal() {
+            modal.hidden = false;
+            loadConversations();
+        }
+
+        function closeModal() {
+            modal.hidden = true;
+        }
+
+        btn.addEventListener('click', openModal);
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        async function loadConversations() {
+            listEl.innerHTML = '<div class="mai-retrain-loading"><span class="mai-spinner"></span> Loading conversations\u2026</div>';
+            try {
+                const data = await apiGet('/admin/conversations');
+                conversations = Array.isArray(data) ? data : [];
+                renderConversations();
+            } catch (err) {
+                listEl.innerHTML = '<div class="mai-retrain-loading">Failed to load conversations.</div>';
+            }
+        }
+
+        function renderConversations() {
+            if (!conversations.length) {
+                listEl.innerHTML = '<div class="mai-retrain-loading">No conversations available.</div>';
+                return;
+            }
+            listEl.innerHTML = '';
+            conversations.forEach(conv => {
+                const name = conv.visitor_name || 'Anonymous';
+                const ts = conv.last_message_at
+                    ? new Date(conv.last_message_at).toLocaleDateString()
+                    : '';
+                const row = document.createElement('label');
+                row.className = 'mai-retrain-conv-row';
+                row.innerHTML =
+                    `<input type="checkbox" value="${conv.id}" class="mai-retrain-cb" />` +
+                    `<div class="mai-retrain-conv-info">` +
+                        `<div class="mai-retrain-conv-name">${escHtml(name)}</div>` +
+                        `<div class="mai-retrain-conv-meta">${escHtml(conv.visitor_email || '')} ${escHtml(ts ? '\u00B7 ' + ts : '')}</div>` +
+                    `</div>` +
+                    `<div class="mai-retrain-conv-msgs">${escHtml(conv.status || '')}</div>`;
+                listEl.appendChild(row);
+            });
+            updateCount();
+        }
+
+        function getSelectedIds() {
+            return Array.from(listEl.querySelectorAll('.mai-retrain-cb:checked'))
+                .map(cb => parseInt(cb.value, 10));
+        }
+
+        function updateCount() {
+            const ids = getSelectedIds();
+            countEl.textContent = ids.length + ' selected';
+            generateBtn.disabled = ids.length === 0;
+        }
+
+        listEl.addEventListener('change', (e) => {
+            if (e.target.matches('.mai-retrain-cb')) {
+                const row = e.target.closest('.mai-retrain-conv-row');
+                if (row) row.classList.toggle('selected', e.target.checked);
+                updateCount();
+            }
+        });
+
+        selectAll.addEventListener('change', () => {
+            const cbs = listEl.querySelectorAll('.mai-retrain-cb');
+            cbs.forEach(cb => {
+                cb.checked = selectAll.checked;
+                const row = cb.closest('.mai-retrain-conv-row');
+                if (row) row.classList.toggle('selected', selectAll.checked);
+            });
+            updateCount();
+        });
+
+        generateBtn.addEventListener('click', async () => {
+            const ids = getSelectedIds();
+            if (!ids.length) return;
+
+            const currentPrompt = document.getElementById('system_prompt')?.value || '';
+            const instructions  = document.getElementById('mai-retrain-instructions')?.value || '';
+
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating\u2026';
+
+            try {
+                const res = await apiPost('/admin/retrain', {
+                    conversation_ids: ids,
+                    current_prompt: currentPrompt,
+                    instructions: instructions,
+                });
+
+                if (res.prompt) {
+                    // Show result in the modal for review before applying
+                    showRetrainResult(res.prompt);
+                }
+            } catch (err) {
+                alert('Failed to generate prompt: ' + err.message);
+            }
+
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Generate New Prompt';
+        });
+
+        function showRetrainResult(newPrompt) {
+            // Remove any existing result block
+            modal.querySelector('.mai-retrain-result')?.remove();
+
+            const body = modal.querySelector('.mai-modal-body');
+            const result = document.createElement('div');
+            result.className = 'mai-retrain-result';
+            result.innerHTML =
+                '<div class="mai-retrain-result-header">' +
+                    '<span>Generated Prompt (review and edit before applying)</span>' +
+                '</div>' +
+                '<textarea id="mai-retrain-result-text" rows="10"></textarea>';
+            body.appendChild(result);
+            result.querySelector('textarea').value = newPrompt;
+
+            // Scroll the result into view
+            result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Add "Apply" button to footer if not already present
+            if (!document.getElementById('mai-retrain-apply')) {
+                const footer = modal.querySelector('.mai-modal-footer');
+                const applyBtn = document.createElement('button');
+                applyBtn.type = 'button';
+                applyBtn.className = 'button button-primary';
+                applyBtn.id = 'mai-retrain-apply';
+                applyBtn.textContent = 'Apply to System Prompt';
+                applyBtn.addEventListener('click', () => {
+                    const resultText = document.getElementById('mai-retrain-result-text')?.value || '';
+                    if (resultText) {
+                        const promptField = document.getElementById('system_prompt');
+                        if (promptField) {
+                            promptField.value = resultText;
+                        }
+                    }
+                    closeModal();
+                });
+                footer.appendChild(applyBtn);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Boot
     // -------------------------------------------------------------------------
     document.addEventListener('DOMContentLoaded', () => {
@@ -784,6 +979,7 @@
         initSettingsForm();
         initExtractionProps();
         initTemplates();
+        initRetrain();
         initMessageScroll();
         initReply();
         initSuggestedReply();

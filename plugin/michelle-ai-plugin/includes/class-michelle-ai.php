@@ -23,8 +23,11 @@ class Michelle_AI {
     // REST API
     // -------------------------------------------------------------------------
     private function define_rest_hooks() {
-        $chat = new Michelle_AI_Chat();
-        $this->loader->add_action( 'rest_api_init', $chat, 'register_routes' );
+        // Supabase proxy handles admin REST endpoints (conversations, messages, settings).
+        // Admin JS calls WP REST → PHP proxy → Supabase Edge Functions.
+        // Visitor endpoints are now called directly by public.js to Edge Functions.
+        $supabase = new Michelle_AI_Supabase();
+        $this->loader->add_action( 'rest_api_init', $supabase, 'register_routes' );
     }
 
     // -------------------------------------------------------------------------

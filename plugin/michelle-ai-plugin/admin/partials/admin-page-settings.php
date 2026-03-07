@@ -6,9 +6,9 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 $s = Michelle_AI_Settings::all();
 
-// Mask API keys
-$api_key_display = $s['openai_api_key'] ? '••••••••' : '';
-$audio_key_display = $s['audio_api_key'] ? '••••••••' : '';
+// Mask API keys (actual keys are in Supabase Vault; wp_options only has a boolean flag)
+$api_key_display = ! empty( $s['openai_api_key_set'] ) ? '••••••••' : '';
+$audio_key_display = ! empty( $s['audio_api_key_set'] ) ? '••••••••' : '';
 ?>
 <div class="wrap mai-admin">
     <h1><?php esc_html_e( 'Michelle AI — Settings', 'michelle-ai-plugin' ); ?></h1>
@@ -163,7 +163,12 @@ $audio_key_display = $s['audio_api_key'] ? '••••••••' : '';
                     <th><label for="system_prompt"><?php esc_html_e( 'System Prompt', 'michelle-ai-plugin' ); ?></label></th>
                     <td>
                         <textarea id="system_prompt" name="system_prompt" rows="6" class="large-text"><?php echo esc_textarea( $s['system_prompt'] ); ?></textarea>
-                        <p class="description"><?php esc_html_e( 'Instructions that define the AI\'s personality and scope.', 'michelle-ai-plugin' ); ?></p>
+                        <div style="margin-top:8px;display:flex;align-items:center;gap:10px;">
+                            <button type="button" class="button" id="mai-retrain-btn">
+                                <?php esc_html_e( 'Retrain from Conversations', 'michelle-ai-plugin' ); ?>
+                            </button>
+                            <p class="description" style="margin:0;"><?php esc_html_e( 'Regenerate the system prompt using selected past conversations as training examples.', 'michelle-ai-plugin' ); ?></p>
+                        </div>
                     </td>
                 </tr>
                 <tr>
@@ -365,4 +370,44 @@ $audio_key_display = $s['audio_api_key'] ? '••••••••' : '';
             </button>
         </p>
     </form>
+</div>
+
+<!-- Retrain Modal -->
+<div id="mai-retrain-modal" class="mai-modal-overlay" hidden>
+    <div class="mai-modal">
+        <div class="mai-modal-header">
+            <h2><?php esc_html_e( 'Retrain System Prompt', 'michelle-ai-plugin' ); ?></h2>
+            <button type="button" class="mai-modal-close" id="mai-retrain-close">&times;</button>
+        </div>
+        <div class="mai-modal-body">
+            <p class="description">
+                <?php esc_html_e( 'Select conversations to use as training examples. The AI will analyze how these conversations went and regenerate the system prompt to handle similar interactions effectively.', 'michelle-ai-plugin' ); ?>
+            </p>
+
+            <div class="mai-retrain-controls">
+                <label>
+                    <input type="checkbox" id="mai-retrain-select-all" />
+                    <?php esc_html_e( 'Select all', 'michelle-ai-plugin' ); ?>
+                </label>
+                <span id="mai-retrain-selected-count">0 selected</span>
+            </div>
+
+            <div id="mai-retrain-conv-list" class="mai-retrain-conv-list">
+                <div class="mai-retrain-loading">
+                    <span class="mai-spinner"></span> <?php esc_html_e( 'Loading conversations…', 'michelle-ai-plugin' ); ?>
+                </div>
+            </div>
+
+            <div class="mai-retrain-options">
+                <label for="mai-retrain-instructions"><?php esc_html_e( 'Additional Instructions (optional)', 'michelle-ai-plugin' ); ?></label>
+                <textarea id="mai-retrain-instructions" rows="3" class="large-text" placeholder="<?php esc_attr_e( 'e.g. Focus on tone, emphasize data collection, keep responses short…', 'michelle-ai-plugin' ); ?>"></textarea>
+            </div>
+        </div>
+        <div class="mai-modal-footer">
+            <button type="button" class="button" id="mai-retrain-cancel"><?php esc_html_e( 'Cancel', 'michelle-ai-plugin' ); ?></button>
+            <button type="button" class="button button-primary" id="mai-retrain-generate" disabled>
+                <?php esc_html_e( 'Generate New Prompt', 'michelle-ai-plugin' ); ?>
+            </button>
+        </div>
+    </div>
 </div>

@@ -22,19 +22,6 @@ define( 'MICHELLE_AI_PLUGIN_DIR',    plugin_dir_path( __FILE__ ) );
 define( 'MICHELLE_AI_PLUGIN_URL',    plugin_dir_url( __FILE__ ) );
 define( 'MICHELLE_AI_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
 
-// Supabase configuration — override in wp-config.php for production
-// MICHELLE_AI_SUPABASE_URL: used by PHP (server-side) — in Docker, use host.docker.internal
-// MICHELLE_AI_SUPABASE_PUBLIC_URL: used by browser JS — always the public-facing URL
-if ( ! defined( 'MICHELLE_AI_SUPABASE_URL' ) ) {
-    define( 'MICHELLE_AI_SUPABASE_URL', 'http://127.0.0.1:54421' );
-}
-if ( ! defined( 'MICHELLE_AI_SUPABASE_PUBLIC_URL' ) ) {
-    define( 'MICHELLE_AI_SUPABASE_PUBLIC_URL', 'http://127.0.0.1:54421' );
-}
-if ( ! defined( 'MICHELLE_AI_SUPABASE_SERVICE_ROLE_KEY' ) ) {
-    define( 'MICHELLE_AI_SUPABASE_SERVICE_ROLE_KEY', '' );
-}
-
 // Core includes (order matters — dependencies first)
 require_once MICHELLE_AI_PLUGIN_DIR . 'includes/class-michelle-ai-settings.php';
 require_once MICHELLE_AI_PLUGIN_DIR . 'includes/class-michelle-ai-db.php';
@@ -47,6 +34,22 @@ require_once MICHELLE_AI_PLUGIN_DIR . 'includes/class-michelle-ai-deactivator.ph
 require_once MICHELLE_AI_PLUGIN_DIR . 'includes/class-michelle-ai.php';
 require_once MICHELLE_AI_PLUGIN_DIR . 'admin/class-michelle-ai-admin.php';
 require_once MICHELLE_AI_PLUGIN_DIR . 'public/class-michelle-ai-public.php';
+
+// Supabase configuration — reads from Settings (wp_options).
+// wp-config.php constants take precedence if defined there.
+if ( ! defined( 'MICHELLE_AI_SUPABASE_URL' ) ) {
+    $__mai_url = Michelle_AI_Settings::get( 'supabase_url', '' );
+    define( 'MICHELLE_AI_SUPABASE_URL', $__mai_url ?: 'http://127.0.0.1:54421' );
+    unset( $__mai_url );
+}
+if ( ! defined( 'MICHELLE_AI_SUPABASE_PUBLIC_URL' ) ) {
+    $__mai_pub = Michelle_AI_Settings::get( 'supabase_public_url', '' );
+    define( 'MICHELLE_AI_SUPABASE_PUBLIC_URL', $__mai_pub ?: MICHELLE_AI_SUPABASE_URL );
+    unset( $__mai_pub );
+}
+if ( ! defined( 'MICHELLE_AI_SUPABASE_SERVICE_ROLE_KEY' ) ) {
+    define( 'MICHELLE_AI_SUPABASE_SERVICE_ROLE_KEY', Michelle_AI_Settings::get_supabase_service_role_key() );
+}
 
 // Lifecycle hooks
 register_activation_hook( __FILE__, [ 'Michelle_AI_Activator', 'activate' ] );

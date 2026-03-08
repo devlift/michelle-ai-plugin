@@ -52,6 +52,11 @@ class Michelle_AI_Settings {
             'document_templates'  => [],
             'letterhead_url'      => '',
 
+            // Supabase connection
+            'supabase_url'              => '',
+            'supabase_public_url'       => '',
+            'supabase_service_role_key' => '',
+
             // Contact form
             'form_title'          => 'Send us a message',
             'form_label_name'     => 'Your Name',
@@ -94,6 +99,9 @@ class Michelle_AI_Settings {
         if ( array_key_exists( 'audio_api_key', $data ) && $data['audio_api_key'] !== '' ) {
             $updated['audio_api_key'] = self::encrypt( $data['audio_api_key'] );
         }
+        if ( array_key_exists( 'supabase_service_role_key', $data ) && $data['supabase_service_role_key'] !== '' ) {
+            $updated['supabase_service_role_key'] = self::encrypt( $data['supabase_service_role_key'] );
+        }
         update_option( self::OPTION_KEY, $updated );
     }
 
@@ -110,6 +118,14 @@ class Michelle_AI_Settings {
      */
     public static function get_audio_api_key() {
         $raw = self::get( 'audio_api_key', '' );
+        return $raw ? self::decrypt( $raw ) : '';
+    }
+
+    /**
+     * Get the decrypted Supabase service role key.
+     */
+    public static function get_supabase_service_role_key() {
+        $raw = self::get( 'supabase_service_role_key', '' );
         return $raw ? self::decrypt( $raw ) : '';
     }
 

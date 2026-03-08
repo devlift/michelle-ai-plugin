@@ -75,6 +75,15 @@ class Michelle_AI_Admin {
 
         add_submenu_page(
             'michelle-ai',
+            __( 'Contacts', 'michelle-ai-plugin' ),
+            __( 'Contacts', 'michelle-ai-plugin' ),
+            'manage_options',
+            'michelle-ai-contacts',
+            [ $this, 'render_contacts_page' ]
+        );
+
+        add_submenu_page(
+            'michelle-ai',
             __( 'Settings', 'michelle-ai-plugin' ),
             __( 'Settings', 'michelle-ai-plugin' ),
             'manage_options',
@@ -88,6 +97,13 @@ class Michelle_AI_Admin {
             return;
         }
         include MICHELLE_AI_PLUGIN_DIR . 'admin/partials/admin-page-conversations.php';
+    }
+
+    public function render_contacts_page() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        include MICHELLE_AI_PLUGIN_DIR . 'admin/partials/admin-page-contacts.php';
     }
 
     public function render_settings_page() {

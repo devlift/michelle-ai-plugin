@@ -9,6 +9,7 @@ $s = Michelle_AI_Settings::all();
 // Mask API keys (actual keys are in Supabase Vault; wp_options only has a boolean flag)
 $api_key_display = ! empty( $s['openai_api_key_set'] ) ? '••••••••' : '';
 $audio_key_display = ! empty( $s['audio_api_key_set'] ) ? '••••••••' : '';
+$srk_display = ! empty( $s['supabase_service_role_key'] ) ? '••••••••' : '';
 ?>
 <div class="wrap mai-admin">
     <h1><?php esc_html_e( 'Michelle AI — Settings', 'michelle-ai-plugin' ); ?></h1>
@@ -25,6 +26,7 @@ $audio_key_display = ! empty( $s['audio_api_key_set'] ) ? '•••••••
         <a href="#extraction" class="mai-tab" data-tab="extraction"><?php esc_html_e( 'Data Collection', 'michelle-ai-plugin' ); ?></a>
         <a href="#templates" class="mai-tab" data-tab="templates"><?php esc_html_e( 'Templates', 'michelle-ai-plugin' ); ?></a>
         <a href="#contact"  class="mai-tab" data-tab="contact"><?php esc_html_e( 'Contact Form', 'michelle-ai-plugin' ); ?></a>
+        <a href="#connection" class="mai-tab" data-tab="connection"><?php esc_html_e( 'Connection', 'michelle-ai-plugin' ); ?></a>
     </div>
 
     <form id="mai-settings-form">
@@ -359,6 +361,33 @@ $audio_key_display = ! empty( $s['audio_api_key_set'] ) ? '•••••••
                     <td>
                         <input type="email" id="form_notify_email" name="form_notify_email" value="<?php echo esc_attr( $s['form_notify_email'] ); ?>" class="regular-text" />
                         <p class="description"><?php esc_html_e( 'Receives an email for each contact form submission.', 'michelle-ai-plugin' ); ?></p>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- ── Connection ─────────────────────────────────────────────────── -->
+        <div class="mai-tab-panel" id="mai-tab-connection" hidden>
+            <table class="form-table">
+                <tr>
+                    <th><label for="supabase_url"><?php esc_html_e( 'API URL (Server)', 'michelle-ai-plugin' ); ?></label></th>
+                    <td>
+                        <input type="url" id="supabase_url" name="supabase_url" value="<?php echo esc_attr( $s['supabase_url'] ); ?>" class="large-text" placeholder="https://your-project-id.supabase.co" />
+                        <p class="description"><?php esc_html_e( 'The backend API URL used by the server. Include the protocol (https://).', 'michelle-ai-plugin' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="supabase_public_url"><?php esc_html_e( 'API URL (Browser)', 'michelle-ai-plugin' ); ?></label></th>
+                    <td>
+                        <input type="url" id="supabase_public_url" name="supabase_public_url" value="<?php echo esc_attr( $s['supabase_public_url'] ); ?>" class="large-text" placeholder="https://your-project-id.supabase.co" />
+                        <p class="description"><?php esc_html_e( 'The public-facing API URL for the chat widget. Usually the same as above. Leave blank to use the server URL.', 'michelle-ai-plugin' ); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="supabase_service_role_key"><?php esc_html_e( 'Service Role Key', 'michelle-ai-plugin' ); ?></label></th>
+                    <td>
+                        <input type="password" id="supabase_service_role_key" name="supabase_service_role_key" value="<?php echo esc_attr( $srk_display ); ?>" class="large-text" autocomplete="new-password" />
+                        <p class="description"><?php esc_html_e( 'The service role secret key for backend API access. This key is encrypted in the database.', 'michelle-ai-plugin' ); ?></p>
                     </td>
                 </tr>
             </table>

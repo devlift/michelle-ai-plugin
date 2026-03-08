@@ -117,7 +117,7 @@
     bottom:         calc(var(--mai-fab-size) + 16px);
     right:          0;
     width:          380px;
-    max-height:     580px;
+    max-height:     min(700px, calc(100vh - 120px));
     display:        flex;
     flex-direction: column;
     background:     var(--mai-bg);
@@ -734,6 +734,6 @@
     #mai-chat-window {
         width: calc(100vw - 32px);
         right: -8px;
-        max-height: 75vh;
+        max-height: calc(100vh - 120px);
     }
 }

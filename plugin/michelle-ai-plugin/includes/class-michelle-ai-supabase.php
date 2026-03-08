@@ -226,6 +226,20 @@ class Michelle_AI_Supabase {
             $wp_data['audio_api_key_set'] = ( is_string( $val ) && $val !== '' && $val !== '••••••••' );
             unset( $wp_data['audio_api_key'] );
         }
+
+        // Supabase connection settings are wp_options-only (not proxied to Edge Functions).
+        // Handle masked service role key — don't overwrite with mask value.
+        if ( isset( $wp_data['supabase_service_role_key'] ) ) {
+            if ( $wp_data['supabase_service_role_key'] === '••••••••' ) {
+                unset( $wp_data['supabase_service_role_key'] );
+            }
+        }
+        // Strip connection settings from the Supabase proxy payload
+        $connection_keys = [ 'supabase_url', 'supabase_public_url', 'supabase_service_role_key' ];
+        foreach ( $connection_keys as $ck ) {
+            unset( $body[ $ck ] );
+        }
+
         Michelle_AI_Settings::save( $wp_data );
 
         return $this->proxy( 'POST', '/settings', [ 'body' => $body ] );
@@ -532,6 +546,36 @@ class Michelle_AI_Supabase {
         }
 
         return $rows;
+    }
+
+    /**
+     * Get contact form submissions (decrypted).
+     */
+    public static function get_contacts( $limit = 100 ) {
+        $result = self::postgrest_get( 'contacts', [
+            'select'  => 'id,name_encrypted,email_encrypted,address_encrypted,message_encrypted,submitted_at',
+            'order'   => 'submitted_at.desc',
+            'limit'   => $limit,
+        ] );
+
+        $contacts = [];
+        foreach ( $result['data'] as $row ) {
+            $name    = ! empty( $row->name_encrypted )    ? self::rpc( 'decrypt_pii', [ 'ciphertext' => $row->name_encrypted ] )    : '';
+            $email   = ! empty( $row->email_encrypted )   ? self::rpc( 'decrypt_pii', [ 'ciphertext' => $row->email_encrypted ] )   : '';
+            $address = ! empty( $row->address_encrypted ) ? self::rpc( 'decrypt_pii', [ 'ciphertext' => $row->address_encrypted ] ) : '';
+            $message = ! empty( $row->message_encrypted ) ? self::rpc( 'decrypt_pii', [ 'ciphertext' => $row->message_encrypted ] ) : '';
+
+            $contacts[] = (object) [
+                'id'           => $row->id,
+                'name'         => $name ?: '',
+                'email'        => $email ?: '',
+                'address'      => $address ?: '',
+                'message'      => $message ?: '',
+                'submitted_at' => $row->submitted_at,
+            ];
+        }
+
+        return $contacts;
     }
 
     /**

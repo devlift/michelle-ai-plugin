@@ -14,6 +14,7 @@
     const cfg = window.michelleAICfg || {};
     const SUPABASE_URL = cfg.supabaseUrl || '';  // e.g. http://127.0.0.1:54421
     const FUNCTIONS_URL = SUPABASE_URL + '/functions/v1';
+    const REST_URL = cfg.restUrl || '';  // WP REST API base
     const chatEnabled = !!cfg.chatEnabled;
 
     // -------------------------------------------------------------------------
@@ -601,7 +602,8 @@
             };
 
             try {
-                const res = await apiFetch(`${FUNCTIONS_URL}/contacts`, 'POST', data);
+                const url = REST_URL ? `${REST_URL}/contact` : `${FUNCTIONS_URL}/contacts`;
+                const res = await apiFetch(url, 'POST', data);
                 form.hidden = true;
                 successMsg.textContent = res.message || 'Thanks! We\'ll be in touch soon.';
                 successEl.hidden = false;

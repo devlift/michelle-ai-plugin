@@ -39,6 +39,7 @@ class Michelle_AI_Public {
             'agentName'   => Michelle_AI_Settings::get( 'agent_name', 'Support' ),
             'logoUrl'     => Michelle_AI_Settings::get( 'logo_url', '' ),
             'audioEnabled' => (bool) Michelle_AI_Settings::get( 'audio_enabled', false ),
+            'restUrl'      => esc_url_raw( rest_url( 'michelle-ai/v1' ) ),
         ] );
     }
 

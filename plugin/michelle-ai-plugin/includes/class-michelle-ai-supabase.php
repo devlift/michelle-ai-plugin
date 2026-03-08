@@ -106,6 +106,14 @@ class Michelle_AI_Supabase {
                 ],
             ],
         ] );
+
+        // ── Public endpoints ────────────────────────────────────────────────
+
+        register_rest_route( self::NS, '/contact', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'public_submit_contact' ],
+            'permission_callback' => '__return_true',
+        ] );
     }
 
     // =========================================================================
@@ -278,6 +286,46 @@ class Michelle_AI_Supabase {
         header( 'Content-Type: ' . $content_type );
         echo $resp['body'];
         exit;
+    }
+
+    // =========================================================================
+    // Public endpoints
+    // =========================================================================
+
+    public function public_submit_contact( $request ) {
+        $body = $request->get_json_params();
+
+        // Proxy to Supabase Edge Function
+        $resp = $this->proxy( 'POST', '/contacts', [ 'body' => $body ] );
+
+        // Send email notification (fire and forget — don't block on failure)
+        $notify_email = Michelle_AI_Settings::get( 'form_notify_email', '' );
+        if ( $notify_email && is_email( $notify_email ) ) {
+            $name    = sanitize_text_field( $body['name'] ?? '' );
+            $email   = sanitize_email( $body['email'] ?? '' );
+            $address = sanitize_text_field( $body['address'] ?? '' );
+            $message = sanitize_textarea_field( $body['message'] ?? '' );
+
+            $subject = sprintf( '[%s] New contact form submission from %s', get_bloginfo( 'name' ), $name ?: 'a visitor' );
+            $lines   = [];
+            $lines[] = 'Name: ' . $name;
+            $lines[] = 'Email: ' . $email;
+            if ( $address ) {
+                $lines[] = 'Address: ' . $address;
+            }
+            $lines[] = '';
+            $lines[] = 'Message:';
+            $lines[] = $message;
+            $lines[] = '';
+            $lines[] = '---';
+            $lines[] = 'Sent via Michelle AI contact form on ' . home_url();
+
+            wp_mail( $notify_email, $subject, implode( "\n", $lines ), [
+                'Reply-To: ' . $name . ' <' . $email . '>',
+            ] );
+        }
+
+        return $resp;
     }
 
     // =========================================================================
